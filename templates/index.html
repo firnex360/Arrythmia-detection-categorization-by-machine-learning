@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ECG Arrhythmia Detector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0b0f1a;
+      --surface:    #111827;
+      --surface2:   #1a2235;
+      --border:     rgba(255,255,255,0.08);
+      --text:       #e2e8f0;
+      --muted:      #64748b;
+      --accent:     #38bdf8;
+      --accent-dim: rgba(56,189,248,0.15);
+      --radius:     14px;
+      --shadow:     0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0 16px 60px;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────────── */
+    header {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 40px 0 32px;
+      text-align: center;
+    }
+    .ecg-line {
+      width: 100%;
+      height: 56px;
+      margin-bottom: 24px;
+      opacity: 0.75;
+    }
+    header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent) 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+    header p {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      line-height: 1.6;
+    }
+
+    /* ── Main card ────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      max-width: 860px;
+      margin: 0 auto 24px;
+      padding: 32px;
+    }
+
+    /* ── Drop zone ────────────────────────────────────────────────────────── */
+    #drop-zone {
+      border: 2px dashed rgba(56,189,248,0.35);
+      border-radius: var(--radius);
+      padding: 56px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.25s, border-color 0.25s;
+      position: relative;
+    }
+    #drop-zone:hover,
+    #drop-zone.drag-over {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+    }
+    #drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .drop-icon {
+      font-size: 3rem;
+      margin-bottom: 14px;
+      display: block;
+    }
+    #drop-zone h2 {
+      font-size: 1.1rem; font-weight: 600; margin-bottom: 8px;
+    }
+    #drop-zone p {
+      font-size: 0.85rem; color: var(--muted);
+    }
+    #file-name {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 1.2em;
+    }
+
+    /* ── Upload button ────────────────────────────────────────────────────── */
+    .btn-row { margin-top: 24px; text-align: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 32px;
+      border-radius: 9px;
+      border: none; cursor: pointer;
+      font-size: 1rem; font-weight: 600; font-family: inherit;
+      background: linear-gradient(135deg, var(--accent) 0%, #818cf8 100%);
+      color: #0b0f1a;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    /* ── Loader ───────────────────────────────────────────────────────────── */
+    #loader { display: none; text-align: center; padding: 40px 0; }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 4px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loader p { color: var(--muted); font-size: 0.9rem; }
+
+    /* ── Error ────────────────────────────────────────────────────────────── */
+    #error-box {
+      display: none;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.4);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      color: #fca5a5;
+      font-size: 0.9rem;
+      margin-top: 20px;
+    }
+
+    /* ── Results ──────────────────────────────────────────────────────────── */
+    #result-section { display: none; }
+
+    .result-header {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 28px;
+    }
+    .pred-badge {
+      padding: 8px 20px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .pred-info h2 { font-size: 1.25rem; font-weight: 600; }
+    .pred-info p  { color: var(--muted); font-size: 0.85rem; margin-top: 3px; }
+
+    .confidence-bar-wrap { margin-bottom: 28px; }
+    .confidence-bar-wrap label {
+      display: flex; justify-content: space-between;
+      font-size: 0.8rem; color: var(--muted); margin-bottom: 6px;
+    }
+    .bar-track {
+      height: 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%; border-radius: 999px;
+      transition: width 0.9s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* Description box */
+    .desc-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-size: 0.88rem;
+      line-height: 1.65;
+      color: #94a3b8;
+      margin-bottom: 28px;
+    }
+
+    /* All-class probability table */
+    .probs-title {
+      font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+    }
+    .prob-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 54px;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .prob-label {
+      font-size: 0.82rem; font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .prob-pct { text-align: right; font-size: 0.82rem; color: var(--muted); }
+
+    /* ECG canvas section */
+    .section-title {
+      font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted);
+      margin: 28px 0 12px;
+    }
+    .ecg-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .ecg-cell {
+      background: #070c14;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .ecg-cell-label {
+      font-size: 0.68rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      padding: 4px 8px 0;
+      letter-spacing: 0.05em;
+    }
+    .ecg-cell canvas {
+      width: 100%; height: 80px;
+      display: block;
+    }
+    .canvas-label {
+      font-size: 0.72rem; color: var(--muted);
+      margin-top: 6px; text-align: right;
+    }
+
+    /* File info chip */
+    .file-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 0.78rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    /* ── Disclaimer ───────────────────────────────────────────────────────── */
+    .disclaimer {
+      max-width: 860px; margin: 0 auto;
+      font-size: 0.75rem; color: var(--muted);
+      text-align: center; line-height: 1.5;
+      opacity: 0.7;
+    }
+
+    /* ── Animations ───────────────────────────────────────────────────────── */
+    .fade-in { animation: fadeIn 0.5s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header>
+  <!-- Animated ECG waveform SVG -->
+  <svg class="ecg-line" viewBox="0 0 900 56" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="wg" x1="0" y1="0" x2="900" y2="0" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0"/>
+        <stop offset="20%" stop-color="#38bdf8" stop-opacity="1"/>
+        <stop offset="80%" stop-color="#818cf8" stop-opacity="1"/>
+        <stop offset="100%" stop-color="#818cf8" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <polyline stroke="url(#wg)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"
+      points="0,28 60,28 80,28 90,10 100,46 110,4 120,52 130,28 150,28
+              210,28 230,28 240,12 250,44 260,6 270,50 280,28 300,28
+              360,28 380,28 390,14 400,42 410,8 420,50 430,28 450,28
+              510,28 530,28 540,12 550,44 560,6 570,50 580,28 600,28
+              660,28 680,28 690,10 700,46 710,4 720,52 730,28 750,28
+              810,28 830,28 840,14 850,42 860,8 870,50 880,28 900,28">
+      <animateTransform attributeName="transform" type="translate"
+        values="0,0;-300,0" dur="2.4s" repeatCount="indefinite"/>
+    </polyline>
+  </svg>
+  <h1>ECG Arrhythmia Detector</h1>
+  <p>Upload a 12-lead ECG file (.dat or .mat) and our deep-learning model will classify the rhythm in seconds.</p>
+</header>
+
+<!-- ── Upload card ─────────────────────────────────────────────────────────── -->
+<div class="card" id="upload-card">
+  <div id="drop-zone">
+    <input type="file" id="file-input" accept=".dat,.mat" />
+    <span class="drop-icon">🫀</span>
+    <h2>Drop your ECG file here</h2>
+    <p>Supported formats: <strong>.dat</strong> &amp; <strong>.mat</strong> (12-lead, PTB-XL compatible)</p>
+    <div id="file-name"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="analyze-btn" disabled>
+      ⚡ Analyze
+    </button>
+  </div>
+
+  <!-- Loading indicator -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <p>Running inference&hellip;</p>
+  </div>
+
+  <!-- Error box -->
+  <div id="error-box"></div>
+</div>
+
+<!-- ── Results card ─────────────────────────────────────────────────────────── -->
+<div class="card" id="result-section">
+  <div id="result-content"></div>
+</div>
+
+<!-- ── Disclaimer ──────────────────────────────────────────────────────────── -->
+<p class="disclaimer">
+  ⚠️ For research and educational purposes only. This tool is <strong>not</strong> a certified medical device
+  and should <strong>not</strong> be used for clinical diagnosis or treatment decisions.
+</p>
+
+<!-- ── Scripts ──────────────────────────────────────────────────────────────── -->
+<script>
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const fileNameEl = document.getElementById('file-name');
+  const analyzeBtn = document.getElementById('analyze-btn');
+  const loader     = document.getElementById('loader');
+  const errorBox   = document.getElementById('error-box');
+  const resultSec  = document.getElementById('result-section');
+  const resultCont = document.getElementById('result-content');
+
+  let selectedFile = null;
+
+  // ── Drag & Drop events ──────────────────────────────────────────────────
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) setFile(f);
+  });
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) setFile(e.target.files[0]);
+  });
+
+  function setFile(f) {
+    selectedFile = f;
+    fileNameEl.textContent = f.name;
+    analyzeBtn.disabled = false;
+    // Reset UI
+    hideError();
+    resultSec.style.display = 'none';
+  }
+
+  // ── Analyze button ──────────────────────────────────────────────────────
+  analyzeBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    showLoader();
+    hideError();
+    resultSec.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const resp = await fetch('/predict', { method: 'POST', body: formData });
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        showError(data.error || 'Unexpected server error.');
+      } else {
+        renderResult(data);
+      }
+    } catch (err) {
+      showError('Network error: ' + err.message);
+    } finally {
+      hideLoader();
+    }
+  });
+
+  // ── UI helpers ──────────────────────────────────────────────────────────
+  function showLoader() {
+    loader.style.display = 'block';
+    analyzeBtn.disabled = true;
+  }
+  function hideLoader() {
+    loader.style.display = 'none';
+    analyzeBtn.disabled = false;
+  }
+  function showError(msg) {
+    errorBox.textContent = '❌ ' + msg;
+    errorBox.style.display = 'block';
+  }
+  function hideError() {
+    errorBox.style.display = 'none';
+  }
+
+  // ── Render results ───────────────────────────────────────────────────────
+  function renderResult(d) {
+    const confPct = (d.confidence * 100).toFixed(1);
+
+    // Build per-class probability rows
+    const classOrder = ['SR', 'AFIB', 'STACH', 'SBRAD', 'TWC'];
+    const probRowsHtml = classOrder.map(cls => {
+      const pct = (d.class_probs[cls] * 100).toFixed(1);
+      const color = d.class_colors[cls];
+      const isBest = cls === d.prediction;
+      return `
+        <div class="prob-row">
+          <span class="prob-label" style="color:${color}">${cls}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:0%;background:${color}" data-w="${pct}"></div>
+          </div>
+          <span class="prob-pct">${pct}%</span>
+        </div>`;
+    }).join('');
+
+    resultCont.innerHTML = `
+      <div class="file-chip">📄 ${escHtml(d.filename)}</div>
+
+      <div class="result-header fade-in">
+        <div class="pred-badge" style="background:${d.color}22;color:${d.color};border:1px solid ${d.color}66">
+          ${d.prediction}
+        </div>
+        <div class="pred-info">
+          <h2>${escHtml(d.full_name)}</h2>
+          <p>Confidence: ${confPct}%</p>
+        </div>
+      </div>
+
+      <div class="confidence-bar-wrap fade-in">
+        <label><span>Model confidence</span><span>${confPct}%</span></label>
+        <div class="bar-track">
+          <div class="bar-fill" id="conf-bar"
+               style="width:0%;background:${d.color}" data-w="${confPct}"></div>
+        </div>
+      </div>
+
+      <div class="desc-box fade-in">${escHtml(d.description)}</div>
+
+      <p class="probs-title">All class probabilities</p>
+      ${probRowsHtml}
+
+      <p class="section-title">12-Lead ECG Waveform Preview</p>
+      <div class="ecg-grid" id="ecg-grid"></div>
+      <p class="canvas-label">All 12 leads · 1000 samples · model uses all leads for inference</p>
+    `;
+
+    resultSec.style.display = 'block';
+
+    // Animate bars after a tiny delay so the DOM has painted
+    setTimeout(() => {
+      document.querySelectorAll('.bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.w + '%';
+      });
+    }, 80);
+
+    // Draw all 12 leads
+    drawMultiLeadECG(d.all_leads, d.color);
+  }
+
+  // ── Multi-lead ECG renderer ──────────────────────────────────────────────
+  function drawMultiLeadECG(allLeads, accentColor) {
+    const grid = document.getElementById('ecg-grid');
+    if (!grid || !allLeads) return;
+    grid.innerHTML = '';
+
+    const LEAD_ORDER = ['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
+
+    LEAD_ORDER.forEach((leadName) => {
+      const signal = allLeads[leadName];
+      if (!signal) return;
+
+      const cell = document.createElement('div');
+      cell.className = 'ecg-cell';
+
+      const lbl = document.createElement('div');
+      lbl.className = 'ecg-cell-label';
+      lbl.textContent = leadName;
+
+      const canvas = document.createElement('canvas');
+      cell.appendChild(lbl);
+      cell.appendChild(canvas);
+      grid.appendChild(cell);
+
+      // Wait for layout so offsetWidth is valid
+      requestAnimationFrame(() => {
+        const dpr = window.devicePixelRatio || 1;
+        const w   = canvas.offsetWidth  || cell.offsetWidth;
+        const h   = canvas.offsetHeight || 80;
+        canvas.width  = w * dpr;
+        canvas.height = h * dpr;
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+
+        ctx.fillStyle = '#070c14';
+        ctx.fillRect(0, 0, w, h);
+
+        // Subtle grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 1;
+        for (let gx = 0; gx < w; gx += 30) {
+          ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke();
+        }
+        for (let gy = 0; gy < h; gy += 20) {
+          ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(w,gy); ctx.stroke();
+        }
+
+        if (!signal.length) return;
+        const min   = Math.min(...signal);
+        const max   = Math.max(...signal);
+        const range = max - min || 1;
+        const pad   = 6;
+        const plotH = h - pad * 2;
+
+        ctx.beginPath();
+        ctx.strokeStyle = accentColor;
+        ctx.lineWidth   = 1.4;
+        ctx.lineJoin    = 'round';
+        signal.forEach((v, i) => {
+          const x = (i / (signal.length - 1)) * w;
+          const y = pad + plotH - ((v - min) / range) * plotH;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      });
+    });
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
