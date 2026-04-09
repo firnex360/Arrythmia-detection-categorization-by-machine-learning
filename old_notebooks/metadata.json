@@ -1,0 +1,1 @@
+{"class_names": ["SR", "AFIB", "STACH", "SBRAD", "TWC"], "n_leads": 12, "n_classes": 5, "dropout_p": 0.5, "lead_index": null}

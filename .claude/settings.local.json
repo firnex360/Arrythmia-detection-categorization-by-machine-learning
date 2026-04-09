@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wsl python3:*)",
+      "Bash(powershell -command \"Get-Content 'e:\\\\visual studio\\\\tesis\\\\Arrythmia-detection-categorization-by-machine-learning\\\\pt_to_img.ipynb' -Raw | Select-Object -First 1\")"
+    ]
+  }
+}
