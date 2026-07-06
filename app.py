@@ -2,8 +2,8 @@
 ECG Arrhythmia Detection Web App
 Flask backend — loads the trained ResNet1D model and exposes a /predict endpoint.
 
-Model:   ecg_arrhythmia_model_v3.pt   (ResNet1D, 4-class: SR / AFIB / STACH / SBRAD)
-History: ecg_arrhythmia_model_v3_history.json  (replaces old metadata.json)
+Model:   ecg_arrhythmia_model_v5_mita.pt   (ResNet1D, 4-class: SR / AFIB / STACH / SBRAD)
+History: ecg_arrhythmia_model_v5_history_mita.json
 
 Supported input formats
 -----------------------
@@ -21,6 +21,8 @@ TARGET_SAMPLES = 1000  (PTB-XL 100 Hz × 10 s, same as training)
 import io
 import json
 import os
+import sys
+import tempfile
 import traceback
 
 import numpy as np
@@ -37,12 +39,33 @@ from flask import Flask, request, jsonify, render_template
 # ──────────────────────────────────────────────────────────────────────────────
 
 BASE_DIR      = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH    = os.path.join(BASE_DIR, "ecg_arrhythmia_model_v3.pt")
-HISTORY_PATH  = os.path.join(BASE_DIR, "ecg_arrhythmia_model_v3_history.json")
+MODEL_PATH    = os.path.join(BASE_DIR, "ecg_arrhythmia_model_v5_mita.pt")
+HISTORY_PATH  = os.path.join(BASE_DIR, "ecg_arrhythmia_model_v5_history_mita.json")
 DEVICE        = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Samples the model was trained on (PTB-XL 100 Hz × 10 s)
 TARGET_SAMPLES = 1000
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ECGtizer (image / PDF → signal) configuration
+#
+# ECGtizer is loaded from a local repo folder dropped into this project as
+# `./ecgtizer` (same layout as testing-ecgtizer-v2.ipynb).  If that folder isn't
+# present we fall back to whatever `ecgtizer` is importable from the environment.
+# The import is done lazily inside parse_image_ecgtizer(), so the server still
+# starts — and .pt / .mat / .dat still work — even when ECGtizer isn't installed.
+# ──────────────────────────────────────────────────────────────────────────────
+
+ECGTIZER_REPO   = os.path.join(BASE_DIR, "ecgtizer")
+if os.path.isdir(ECGTIZER_REPO) and ECGTIZER_REPO not in sys.path:
+    sys.path.insert(0, ECGTIZER_REPO)
+
+# Digitisation settings — mirror the notebook's doctor-image case.
+ECGTIZER_DPI     = 200            # notebook: 500 > 300 > 150 for clean renders
+ECGTIZER_METHOD  = "fragmented"   # 'full' | 'fragmented' | 'lazy'
+# Assumed clinical layout of the uploaded ECG. Only the classic 3x4 layout is
+# wired up (LEAD_TIME_3X4); switch to LEAD_TIME_6X2 here if your prints use 6x2.
+ECGTIZER_LAYOUT  = "3x4"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Load training history
@@ -61,7 +84,9 @@ N_CLASSES   = len(CLASS_NAMES)
 # Accepted file extensions
 SIGNAL_EXTS = {".dat", ".mat", ".pt"}
 IMAGE_EXTS  = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif"}
-ALL_EXTS    = SIGNAL_EXTS | IMAGE_EXTS
+PDF_EXTS    = {".pdf"}                       # ECGtizer digitises clinical PDFs too
+DIGITISE_EXTS = IMAGE_EXTS | PDF_EXTS        # everything routed through ECGtizer
+ALL_EXTS    = SIGNAL_EXTS | DIGITISE_EXTS
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Rich label info
@@ -99,6 +124,39 @@ _DESCRIPTIONS = {
     "RBBB":  "Right bundle branch block — widened QRS with right-sided conduction delay.",
     "PAC":   "Premature atrial complex — early atrial impulse generating a premature beat.",
     "PVC":   "Premature ventricular complex — wide QRS from an early ventricular impulse.",
+}
+
+# What clinical/waveform features are characteristic of each class.  This is the
+# "why" dictionary requested for the UI: it explains, in plain language, which
+# ECG features the model tends to rely on when it settles on a given verdict.
+# (These are the known morphological hallmarks of each rhythm — they help the
+# user interpret the Grad-CAM heat-map, which highlights *where* in the trace the
+# model concentrated.)
+_KEY_FEATURES = {
+    "SR": [
+        "Regular R-R intervals (even spacing between beats)",
+        "A clear, upright P wave before every QRS complex",
+        "Rate between 60 and 100 bpm",
+        "Consistent, narrow QRS morphology",
+    ],
+    "AFIB": [
+        "Irregularly irregular R-R intervals (no repeating pattern)",
+        "Absent P waves — replaced by chaotic fibrillatory (f) waves",
+        "Wavy, undulating baseline between QRS complexes",
+        "Often a rapid ventricular response",
+    ],
+    "STACH": [
+        "Fast rate (>100 bpm) with tightly packed beats",
+        "Regular R-R intervals despite the speed",
+        "Normal P wave preceding each QRS",
+        "Shortened T-P segment (less rest between beats)",
+    ],
+    "SBRAD": [
+        "Slow rate (<60 bpm) with widely spaced beats",
+        "Regular R-R intervals",
+        "Normal upright P wave before each QRS",
+        "Long, flat T-P segment (extended rest between beats)",
+    ],
 }
 
 _COLORS = {
@@ -202,7 +260,7 @@ if CKPT_N_CLASSES != N_CLASSES:
 model = ResNet1D(n_leads=CKPT_N_LEADS, n_classes=CKPT_N_CLASSES).to(DEVICE)
 model.load_state_dict(state)
 model.eval()
-print(f"[OK] ecg_arrhythmia_model_v3.pt loaded — "
+print(f"[OK] {os.path.basename(MODEL_PATH)} loaded — "
       f"{CKPT_N_LEADS} leads, {CKPT_N_CLASSES} classes: {CLASS_NAMES}  on {DEVICE}")
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -365,6 +423,199 @@ def parse_image(file_bytes: bytes):
     return x_tensor, raw_display
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  ▞▞  IMAGE / PDF  →  .pt  CONVERSION  via  ECGtizer  ▞▞
+#
+#  This is the real digitiser, ported from testing-ecgtizer-v2.ipynb.  It takes a
+#  photo/scan/PDF of a standard 12-lead clinical ECG (3x4 "classic" layout),
+#  reconstructs all 12 leads, and returns a (12, 1000) tensor in millivolts —
+#  exactly the shape/scale the model was trained on, so inference, Grad-CAM and
+#  the Flutter UI all work unchanged.
+#
+#  Requirements (see README):
+#    * Drop the ECGtizer repo into ./ecgtizer  (or pip-install it).
+#    * Its deps must be available: opencv-python (cv2), PyMuPDF/fitz, scipy, etc.
+#    * The image must be a proper clinical printout, 3x4 layout, high resolution
+#      (>= ~1500x800, ideally 2000+ wide) or fewer than 12 leads will be found.
+#
+#  The crude single-lead `parse_image` above is kept only as an emergency fallback
+#  (see IMAGE_FALLBACK_CENTROID) for when ECGtizer can't be loaded.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# If ECGtizer is unavailable, fall back to the rough centroid digitiser instead
+# of failing.  Off by default because that fallback is not clinically meaningful.
+IMAGE_FALLBACK_CENTROID = False
+
+
+def ecgtizer_to_ptbxl(extracted_leads, lead_time_map, target_samples=TARGET_SAMPLES):
+    """
+    Convert ECGtizer's extracted leads to a PTB-XL-style (target_samples, 12)
+    array in millivolts.  Ported verbatim from the notebook's `ecgtizer_to_ptbxl`.
+
+    ECGtizer (3x4 layout) gives each lead as 5000 samples (10 s @ 500 Hz) in µV,
+    with the lead's active data sitting in a specific time window (the rest is
+    zero-padded).  We slice each window, convert µV→mV, and resample 500→100 Hz.
+    """
+    from scipy.signal import resample
+
+    ecgtizer_names = ["I", "II", "III", "AVR", "AVL", "AVF",
+                      "V1", "V2", "V3", "V4", "V5", "V6"]
+
+    signal = np.zeros((target_samples, 12), dtype=np.float32)
+
+    for col_idx, lead_name in enumerate(ecgtizer_names):
+        if lead_name not in extracted_leads:
+            continue
+
+        raw = np.asarray(extracted_leads[lead_name], dtype=np.float32)
+        t_start, t_end = lead_time_map[lead_name]      # positions at 500 Hz
+
+        segment_mv = raw[t_start:t_end] / 1000.0       # µV → mV
+
+        orig_start = t_start // 5                       # 500 Hz → 100 Hz
+        orig_end   = t_end // 5
+        target_len = orig_end - orig_start
+
+        if len(segment_mv) > 0 and target_len > 0:
+            resampled = resample(segment_mv, target_len)
+        else:
+            resampled = np.zeros(target_len, dtype=np.float32)
+
+        signal[orig_start:orig_end, col_idx] = resampled
+
+    return signal
+
+
+def parse_image_ecgtizer(file_bytes: bytes, ext: str):
+    """
+    Digitise a clinical ECG image/PDF into a (12, 1000) tensor using ECGtizer.
+
+    Returns (x_tensor, raw_display) just like the other parse_* helpers.
+    Raises RuntimeError with an actionable message if ECGtizer isn't available
+    or the image can't be digitised into 12 leads.
+    """
+    try:
+        from ecgtizer import ECGtizer
+        if ECGTIZER_LAYOUT == "6x2":
+            from ecgtizer.PDF2XML import LEAD_TIME_6X2 as LEAD_TIME
+        else:
+            from ecgtizer.PDF2XML import LEAD_TIME_3X4 as LEAD_TIME
+    except Exception as exc:                                   # not installed
+        raise RuntimeError(
+            "ECGtizer is not available, so ECG images/PDFs can't be digitised. "
+            "Drop the ECGtizer repo into ./ecgtizer (and install its dependencies: "
+            "opencv-python, PyMuPDF, scipy), or upload a raw .pt / .mat / .dat file "
+            f"instead. (import error: {exc})"
+        )
+
+    # ECGtizer reads from a path, so persist the upload to a temp file first.
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+
+        ecg = ECGtizer(
+            file=tmp_path,
+            dpi=ECGTIZER_DPI,
+            extraction_method=ECGTIZER_METHOD,
+            verbose=False,
+        )
+        leads = ecg.extracted_lead
+
+        if not isinstance(leads, dict) or len(leads) < 12:
+            n = len(leads) if isinstance(leads, dict) else 0
+            raise RuntimeError(
+                f"ECGtizer only extracted {n}/12 leads. This usually means the "
+                "image resolution is too low or the layout isn't the expected "
+                f"{ECGTIZER_LAYOUT} clinical format. Use a sharper scan "
+                "(>= ~2000 px wide) of a standard 12-lead printout."
+            )
+
+        signal = ecgtizer_to_ptbxl(leads, LEAD_TIME, TARGET_SAMPLES)  # (1000, 12) mV
+        data   = signal.T.astype(np.float32)                          # (12, 1000)
+
+        x_tensor    = torch.tensor(data, dtype=torch.float32)
+        raw_display = (data * 1000.0).astype(np.float32)
+        return x_tensor, raw_display
+
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Grad-CAM  — explains *where* in the trace the model focused
+# ──────────────────────────────────────────────────────────────────────────────
+
+def compute_gradcam(x_input: torch.Tensor, class_idx: int) -> list:
+    """
+    Grad-CAM for the 1-D ResNet.
+
+    Hooks the last residual stage (`model.layer3`), captures its activations and
+    the gradient of the target class score w.r.t. those activations, then builds
+    a per-time-step importance curve resampled to TARGET_SAMPLES and normalised
+    to 0..1.  A value near 1 means "the model leaned heavily on this part of the
+    signal when choosing `class_idx`".
+
+    Returns a plain Python list of length TARGET_SAMPLES.
+    """
+    activations = {}
+    gradients   = {}
+
+    def fwd_hook(_module, _inp, out):
+        activations["value"] = out.detach()
+
+    def bwd_hook(_module, _grad_in, grad_out):
+        gradients["value"] = grad_out[0].detach()
+
+    h1 = model.layer3.register_forward_hook(fwd_hook)
+    # full_backward_hook is the modern API; fall back for older torch builds
+    try:
+        h2 = model.layer3.register_full_backward_hook(bwd_hook)
+    except AttributeError:                                    # pragma: no cover
+        h2 = model.layer3.register_backward_hook(bwd_hook)
+
+    try:
+        was_training = model.training
+        model.eval()
+        model.zero_grad(set_to_none=True)
+
+        x = x_input.clone().requires_grad_(True)
+        logits = model(x)                                    # (1, n_classes)
+        score  = logits[0, class_idx]
+        score.backward()
+
+        acts  = activations["value"][0]                      # (C, L)
+        grads = gradients["value"][0]                        # (C, L)
+
+        # Channel weights = global-average-pooled gradients
+        weights = grads.mean(dim=1, keepdim=True)            # (C, 1)
+        cam = F.relu((weights * acts).sum(dim=0))            # (L,)
+
+        # Resample the coarse CAM up to the full signal length
+        cam = cam.view(1, 1, -1)
+        cam = F.interpolate(cam, size=TARGET_SAMPLES, mode="linear",
+                            align_corners=False).view(-1)
+
+        # Normalise 0..1
+        cam = cam - cam.min()
+        maxv = cam.max()
+        if maxv > 0:
+            cam = cam / maxv
+
+        if was_training:
+            model.train()
+        return cam.cpu().tolist()
+
+    finally:
+        h1.remove()
+        h2.remove()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Flask app
 # ──────────────────────────────────────────────────────────────────────────────
@@ -373,9 +624,30 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024   # 50 MB
 
 
+@app.after_request
+def _add_cors_headers(resp):
+    """Allow the Flutter app (any origin/device) to call this API."""
+    resp.headers["Access-Control-Allow-Origin"]  = "*"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return resp
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/health")
+def health():
+    """Lightweight probe so the Flutter app can confirm the backend is reachable."""
+    return jsonify({
+        "status":      "ok",
+        "model":       os.path.basename(MODEL_PATH),
+        "n_leads":     CKPT_N_LEADS,
+        "class_names": CLASS_NAMES,
+        "device":      str(DEVICE),
+    })
 
 
 @app.route("/predict", methods=["POST"])
@@ -406,15 +678,31 @@ def predict():
             x_tensor, raw_signal = parse_mat(file_bytes)
         elif ext == ".pt":
             x_tensor, raw_signal = parse_pt(file_bytes)
+        elif ext in DIGITISE_EXTS:
+            # Image / PDF path — digitise all 12 leads with ECGtizer.
+            try:
+                x_tensor, raw_signal = parse_image_ecgtizer(file_bytes, ext)
+                image_warning = (
+                    "This ECG was digitised from an image/PDF with ECGtizer, assuming a "
+                    f"standard {ECGTIZER_LAYOUT} clinical layout. Extraction quality depends "
+                    "on image resolution and print quality — double-check the traces against "
+                    "the source before relying on the result."
+                )
+            except RuntimeError:
+                # ECGtizer unavailable or couldn't digitise. Only fall back to the
+                # crude single-lead method if explicitly enabled; otherwise surface
+                # the actionable error to the user.
+                if IMAGE_FALLBACK_CENTROID:
+                    x_tensor, raw_signal = parse_image(file_bytes)
+                    image_warning = (
+                        "ECGtizer could not digitise this image, so a rough single-lead "
+                        "fallback was used (one channel copied across all 12 leads). This is "
+                        "NOT reliable — upload a raw .pt / .mat / .dat file for a real result."
+                    )
+                else:
+                    raise
         else:
-            # Image path
-            x_tensor, raw_signal = parse_image(file_bytes)
-            image_warning = (
-                "Prediction was made from an image. Only one signal channel could be "
-                "extracted and was replicated across all 12 leads. Accuracy is lower "
-                "than with raw ECG data (.dat / .mat / .pt). Use raw signal files for "
-                "reliable clinical results."
-            )
+            return jsonify({"error": f"Unsupported file type '{ext}'."}), 400
 
         # Add batch dimension → (1, 12, 1000)
         x_input = x_tensor.unsqueeze(0).to(DEVICE)
@@ -429,22 +717,28 @@ def predict():
 
         class_probs = {CLASS_NAMES[i]: float(probs[i].item()) for i in range(N_CLASSES)}
 
+        # Grad-CAM importance curve for the winning class (0..1, length 1000)
+        gradcam = compute_gradcam(x_input, pred_idx)
+
         LEAD_LABELS = ["I", "II", "III", "aVR", "aVL", "aVF",
                        "V1", "V2", "V3", "V4", "V5", "V6"]
         all_leads = {LEAD_LABELS[i]: raw_signal[i, :].tolist()
                      for i in range(raw_signal.shape[0])}
 
         response = {
-            "prediction":   pred_class,
-            "full_name":    _FULL_NAMES.get(pred_class, pred_class),
-            "description":  _DESCRIPTIONS.get(pred_class, ""),
-            "color":        _COLORS.get(pred_class, "#38bdf8"),
-            "confidence":   confidence,
-            "class_probs":  class_probs,
-            "class_colors": {c: _COLORS.get(c, "#38bdf8") for c in CLASS_NAMES},
-            "class_names":  {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES},
-            "all_leads":    all_leads,
-            "filename":     filename,
+            "prediction":    pred_class,
+            "full_name":     _FULL_NAMES.get(pred_class, pred_class),
+            "description":   _DESCRIPTIONS.get(pred_class, ""),
+            "key_features":  _KEY_FEATURES.get(pred_class, []),
+            "color":         _COLORS.get(pred_class, "#38bdf8"),
+            "confidence":    confidence,
+            "class_probs":   class_probs,
+            "class_colors":  {c: _COLORS.get(c, "#38bdf8") for c in CLASS_NAMES},
+            "class_names":   {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES},
+            "all_leads":     all_leads,
+            "gradcam":       gradcam,
+            "gradcam_lead":  "II",
+            "filename":      filename,
         }
 
         if image_warning:

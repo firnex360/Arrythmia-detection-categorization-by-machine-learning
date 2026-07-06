@@ -5,3 +5,5 @@ A machine-learning approach for detection and categorize of arrythmia anomalies 
 + 1st_ecg_arrythmia_model_v2.pt WORKS WITH learning_6_improved.ipynb VERSION
 
 + ecg_arrythmia_model_v3.pt WORKS WITH learning_lastver.ipynb VERSION
+
++ needs to run flutter & python backend

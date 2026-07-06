@@ -35,6 +35,13 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Talks to the Python/Flask backend (app.py) that runs the ECG model.
+  http: ^1.2.2
+  # Import ECG data files (.pt / .mat / .dat) and images from the device.
+  file_picker: ^8.1.2
+  # Take a photo of an ECG with the device camera (or pick from gallery).
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
