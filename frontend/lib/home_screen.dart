@@ -1,3 +1,4 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -76,6 +77,42 @@ class _HomeScreenState extends State<HomeScreen> {
     if (shot == null) return null;
     final bytes = await shot.readAsBytes();
     return _PickedFile(bytes, shot.name);
+  }
+
+  Future<void> _handleDrop(DropDoneDetails details) async {
+    if (_busy) return;
+    if (details.files.isEmpty) return;
+
+    final xfile = details.files.first;
+    
+    setState(() {
+      _busy = true;
+      _status = 'Reading dropped file…';
+    });
+
+    try {
+      final bytes = await xfile.readAsBytes();
+      final picked = _PickedFile(bytes, xfile.name);
+      
+      setState(() => _status = 'Running the model on ${picked.name}…');
+      final result = await ApiService.predict(bytes: picked.bytes, filename: picked.name);
+      
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _status = '';
+      });
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ResultScreen(result: result)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _status = '';
+      });
+      _showError('$e');
+    }
   }
 
   void _showError(String message) {
@@ -177,11 +214,10 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const _Hero(),
               const SizedBox(height: 28),
-              _ActionButton(
-                icon: Icons.upload_file_rounded,
-                label: 'Import ECG file',
-                sub: '.pt · .mat · .dat · image · PDF',
+              _DropZoneButton(
                 onTap: _busy ? null : () => _run(_pickFile),
+                onDrop: _handleDrop,
+                busy: _busy,
               ),
               const SizedBox(height: 12),
               if (showCamera)
@@ -333,3 +369,76 @@ class _PickedFile {
   final String name;
   _PickedFile(this.bytes, this.name);
 }
+
+class _DropZoneButton extends StatefulWidget {
+  final VoidCallback? onTap;
+  final ValueChanged<DropDoneDetails>? onDrop;
+  final bool busy;
+
+  const _DropZoneButton({this.onTap, this.onDrop, this.busy = false});
+
+  @override
+  State<_DropZoneButton> createState() => _DropZoneButtonState();
+}
+
+class _DropZoneButtonState extends State<_DropZoneButton> {
+  bool _isDragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _isDragging = true),
+      onDragExited: (_) => setState(() => _isDragging = false),
+      onDragDone: (details) {
+        setState(() => _isDragging = false);
+        if (widget.onDrop != null && !widget.busy) {
+          widget.onDrop!(details);
+        }
+      },
+      child: Material(
+        color: _isDragging ? AppColors.surface.withOpacity(0.5) : AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: widget.onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _isDragging ? AppColors.accent : AppColors.border,
+                width: _isDragging ? 2 : 1,
+              ),
+              color: _isDragging ? AppColors.accent.withOpacity(0.1) : null,
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.cloud_upload_outlined,
+                  size: 42,
+                  color: _isDragging ? AppColors.accent : AppColors.muted,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _isDragging ? 'Drop file here' : 'Click to browse or drop a file here',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: _isDragging ? AppColors.accent : AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '.pt · .mat · .dat · image · PDF',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
