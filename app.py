@@ -499,7 +499,7 @@ def parse_image_ecgtizer(file_bytes: bytes, ext: str):
                 "(>= ~2000 px wide) of a standard 12-lead printout."
             )
 
-        signal = ecgtizer_to_ptbxl(leads, target_samples=TARGET_SAMPLES, layout=ECGTIZER_LAYOUT)  # (1000, 12) mV
+        signal = ecgtizer_to_ptbxl(leads, target_samples=TARGET_SAMPLES, layout="auto")  # (1000, 12) mV
         data   = signal.T.astype(np.float32)                          # (12, 1000)
 
         x_tensor    = torch.tensor(data, dtype=torch.float32)

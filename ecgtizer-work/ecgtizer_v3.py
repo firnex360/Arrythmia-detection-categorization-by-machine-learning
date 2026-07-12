@@ -19,12 +19,34 @@ except ImportError as e:
     print(e)
     sys.exit(1)
 
-def ecgtizer_to_ptbxl(extracted_leads, target_samples=1000, layout="3x4"):
+def detect_layout(extracted_leads):
+    """
+    Automatically detect whether the ECG image was 3x4 or 6x2 format.
+    In 3x4, AVR starts at 2.5s (index 1250). In 6x2, it starts at 0s (index 0).
+    In 3x4, V4 starts at 7.5s (index 3750). In 6x2, it starts at 5.0s (index 2500).
+    """
+    if 'AVR' in extracted_leads:
+        nz = np.nonzero(extracted_leads['AVR'])[0]
+        if len(nz) > 0 and nz[0] < 1000:
+            return "6x2"
+            
+    if 'V4' in extracted_leads:
+        nz = np.nonzero(extracted_leads['V4'])[0]
+        if len(nz) > 0 and nz[0] < 3000:
+            return "6x2"
+            
+    return "3x4"
+
+def ecgtizer_to_ptbxl(extracted_leads, target_samples=1000, layout="auto"):
     """
     Convert ECGtizer extracted leads to PTB-XL compatible numpy array.
     
     Uses Tiling with a Manual Phase Shift logic to construct a 10-second signal.
     """
+    if layout == "auto":
+        layout = detect_layout(extracted_leads)
+        print(f"Auto-detected layout: {layout}")
+        
     ecgtizer_names = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF',
                       'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
     
