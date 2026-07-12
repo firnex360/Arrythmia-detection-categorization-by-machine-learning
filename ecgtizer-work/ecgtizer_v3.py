@@ -59,20 +59,27 @@ def ecgtizer_to_ptbxl(extracted_leads, target_samples=1000, layout="3x4"):
             tiled[0:target_len] = resampled
             
             # --- PHASE SHIFT SETTING ---
-            shift_seconds = 0.3  # Push the second tile 0.3 seconds to the right
+            shift_seconds = 0.3  # Push the next tile 0.3 seconds to the right
             shift_samples = int(shift_seconds * 100) # 100Hz = 100 samples/sec
             
-            # 2. Place the second tile shifted to the right
-            start_idx = target_len + shift_samples
-            if start_idx < target_samples:
-                space_left = target_samples - start_idx
-                tiled[start_idx:] = resampled[:space_left]
+            last_end = target_len
+            current_start = target_len + shift_samples
+            
+            # 2. Tile repeatedly until we fill target_samples
+            while current_start < target_samples:
+                space_left = target_samples - current_start
+                n_place = min(target_len, space_left)
+                
+                tiled[current_start : current_start + n_place] = resampled[:n_place]
                 
                 # 3. Fill the gap with a smooth flat baseline
-                v_start = tiled[target_len - 1]
-                v_end = tiled[start_idx]
-                gap_size = (start_idx + 1) - (target_len - 1)
-                tiled[target_len - 1 : start_idx + 1] = np.linspace(v_start, v_end, gap_size)
+                v_start = tiled[last_end - 1]
+                v_end = tiled[current_start]
+                gap_size = (current_start + 1) - (last_end - 1)
+                tiled[last_end - 1 : current_start + 1] = np.linspace(v_start, v_end, gap_size)
+                
+                last_end = current_start + n_place
+                current_start = last_end + shift_samples
             
             signal[:, col_idx] = tiled
             

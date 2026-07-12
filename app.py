@@ -447,65 +447,7 @@ def parse_image(file_bytes: bytes):
 IMAGE_FALLBACK_CENTROID = False
 
 
-def ecgtizer_to_ptbxl(extracted_leads, lead_time_map, target_samples=TARGET_SAMPLES):
-    """
-    Convert ECGtizer's extracted leads to a PTB-XL-style (target_samples, 12)
-    array in millivolts.
 
-    Uses Tiling with a Manual Phase Shift logic to construct a 10-second signal
-    from the shorter active segment of each lead.
-    """
-    from scipy.signal import resample
-
-    ecgtizer_names = ["I", "II", "III", "AVR", "AVL", "AVF",
-                      "V1", "V2", "V3", "V4", "V5", "V6"]
-
-    signal = np.zeros((target_samples, 12), dtype=np.float32)
-
-    for col_idx, lead_name in enumerate(ecgtizer_names):
-        if lead_name not in extracted_leads:
-            continue
-
-        raw = np.asarray(extracted_leads[lead_name], dtype=np.float32)
-        t_start, t_end = lead_time_map[lead_name]      # positions at 500 Hz
-
-        segment_mv = raw[t_start:t_end] / 1000.0       # µV → mV
-
-        orig_start = t_start // 5                       # 500 Hz → 100 Hz
-        orig_end   = t_end // 5
-        target_len = orig_end - orig_start
-
-        if len(segment_mv) > 0 and target_len > 0:
-            resampled = resample(segment_mv, target_len)
-        else:
-            resampled = np.zeros(target_len, dtype=np.float32)
-
-        # Tiling with a Manual Phase Shift
-        if len(resampled) > 0:
-            tiled = np.zeros(target_samples, dtype=np.float32)
-            
-            # 1. Place the first tile normally
-            tiled[0:target_len] = resampled
-            
-            # --- PHASE SHIFT SETTING ---
-            shift_seconds = 0.3  # Push the second tile 0.3 seconds to the right
-            shift_samples = int(shift_seconds * 100) # 100Hz = 100 samples/sec
-            
-            # 2. Place the second tile shifted to the right
-            start_idx = target_len + shift_samples
-            if start_idx < target_samples:
-                space_left = target_samples - start_idx
-                tiled[start_idx:] = resampled[:space_left]
-                
-                # 3. Fill the gap with a smooth flat baseline
-                v_start = tiled[target_len - 1]
-                v_end = tiled[start_idx]
-                gap_size = (start_idx + 1) - (target_len - 1)
-                tiled[target_len - 1 : start_idx + 1] = np.linspace(v_start, v_end, gap_size)
-            
-            signal[:, col_idx] = tiled
-
-    return signal
 
 
 def parse_image_ecgtizer(file_bytes: bytes, ext: str):
@@ -518,10 +460,13 @@ def parse_image_ecgtizer(file_bytes: bytes, ext: str):
     """
     try:
         from ecgtizer import ECGtizer
-        if ECGTIZER_LAYOUT == "6x2":
-            from ecgtizer.PDF2XML import LEAD_TIME_6X2 as LEAD_TIME
-        else:
-            from ecgtizer.PDF2XML import LEAD_TIME_3X4 as LEAD_TIME
+        
+        # Add ecgtizer-work to path so we can import our standalone script logic
+        ECGTIZER_WORK = os.path.join(BASE_DIR, "ecgtizer-work")
+        if ECGTIZER_WORK not in sys.path:
+            sys.path.insert(0, ECGTIZER_WORK)
+            
+        from ecgtizer_v3 import ecgtizer_to_ptbxl
     except Exception as exc:                                   # not installed
         raise RuntimeError(
             "ECGtizer is not available, so ECG images/PDFs can't be digitised. "
@@ -554,7 +499,7 @@ def parse_image_ecgtizer(file_bytes: bytes, ext: str):
                 "(>= ~2000 px wide) of a standard 12-lead printout."
             )
 
-        signal = ecgtizer_to_ptbxl(leads, LEAD_TIME, TARGET_SAMPLES)  # (1000, 12) mV
+        signal = ecgtizer_to_ptbxl(leads, target_samples=TARGET_SAMPLES, layout=ECGTIZER_LAYOUT)  # (1000, 12) mV
         data   = signal.T.astype(np.float32)                          # (12, 1000)
 
         x_tensor    = torch.tensor(data, dtype=torch.float32)
