@@ -450,11 +450,10 @@ IMAGE_FALLBACK_CENTROID = False
 def ecgtizer_to_ptbxl(extracted_leads, lead_time_map, target_samples=TARGET_SAMPLES):
     """
     Convert ECGtizer's extracted leads to a PTB-XL-style (target_samples, 12)
-    array in millivolts.  Ported verbatim from the notebook's `ecgtizer_to_ptbxl`.
+    array in millivolts.
 
-    ECGtizer (3x4 layout) gives each lead as 5000 samples (10 s @ 500 Hz) in µV,
-    with the lead's active data sitting in a specific time window (the rest is
-    zero-padded).  We slice each window, convert µV→mV, and resample 500→100 Hz.
+    Uses Tiling with a Manual Phase Shift logic to construct a 10-second signal
+    from the shorter active segment of each lead.
     """
     from scipy.signal import resample
 
@@ -481,7 +480,30 @@ def ecgtizer_to_ptbxl(extracted_leads, lead_time_map, target_samples=TARGET_SAMP
         else:
             resampled = np.zeros(target_len, dtype=np.float32)
 
-        signal[orig_start:orig_end, col_idx] = resampled
+        # Tiling with a Manual Phase Shift
+        if len(resampled) > 0:
+            tiled = np.zeros(target_samples, dtype=np.float32)
+            
+            # 1. Place the first tile normally
+            tiled[0:target_len] = resampled
+            
+            # --- PHASE SHIFT SETTING ---
+            shift_seconds = 0.3  # Push the second tile 0.3 seconds to the right
+            shift_samples = int(shift_seconds * 100) # 100Hz = 100 samples/sec
+            
+            # 2. Place the second tile shifted to the right
+            start_idx = target_len + shift_samples
+            if start_idx < target_samples:
+                space_left = target_samples - start_idx
+                tiled[start_idx:] = resampled[:space_left]
+                
+                # 3. Fill the gap with a smooth flat baseline
+                v_start = tiled[target_len - 1]
+                v_end = tiled[start_idx]
+                gap_size = (start_idx + 1) - (target_len - 1)
+                tiled[target_len - 1 : start_idx + 1] = np.linspace(v_start, v_end, gap_size)
+            
+            signal[:, col_idx] = tiled
 
     return signal
 
