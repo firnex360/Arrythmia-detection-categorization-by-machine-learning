@@ -11,6 +11,18 @@ class AppColors {
   static const accent = Color(0xFF38BDF8);
 }
 
+/// Per-class accent colours, matching the backend's `_COLORS` in app.py. Used
+/// for history rows and dashboard bars where the full prediction (and its colour)
+/// isn't available.
+const Map<String, Color> kArrhythmiaColors = {
+  'SR': Color(0xFF10B981),
+  'AFIB': Color(0xFFEF4444),
+  'STACH': Color(0xFFF59E0B),
+  'SBRAD': Color(0xFF3B82F6),
+};
+
+Color arrhythmiaColor(String code) => kArrhythmiaColors[code] ?? AppColors.accent;
+
 ThemeData buildAppTheme() {
   final base = ThemeData.dark(useMaterial3: true);
   return base.copyWith(

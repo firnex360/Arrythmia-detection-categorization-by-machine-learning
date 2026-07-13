@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'home_screen.dart';
+import 'login_screen.dart';
 import 'theme.dart';
 
 void main() {
@@ -16,7 +16,7 @@ class EcgApp extends StatelessWidget {
       title: 'ECG Arrhythmia Detector',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: const HomeScreen(),
+      home: const LoginScreen(),
     );
   }
 }

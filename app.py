@@ -29,10 +29,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from functools import wraps
+
 from PIL import Image
 from scipy.io import loadmat
 from scipy.ndimage import gaussian_filter1d
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, g
+
+import db
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Paths
@@ -93,69 +97,68 @@ ALL_EXTS    = SIGNAL_EXTS | DIGITISE_EXTS
 # ──────────────────────────────────────────────────────────────────────────────
 
 _FULL_NAMES = {
-    "SR":    "Sinus Rhythm",
-    "AFIB":  "Atrial Fibrillation",
-    "STACH": "Sinus Tachycardia",
-    "SBRAD": "Sinus Bradycardia",
-    "NORM":  "Normal Sinus Rhythm",
-    "MI":    "Myocardial Infarction",
-    "STTC":  "ST/T-Wave Change",
-    "CD":    "Conduction Disturbance",
-    "HYP":   "Hypertrophy",
-    "TWC":   "T-Wave Change",
-    "LBBB":  "Left Bundle Branch Block",
-    "RBBB":  "Right Bundle Branch Block",
-    "PAC":   "Premature Atrial Complex",
-    "PVC":   "Premature Ventricular Complex",
+    "SR":    "Ritmo Sinusal",
+    "AFIB":  "Fibrilación Auricular",
+    "STACH": "Taquicardia Sinusal",
+    "SBRAD": "Bradicardia Sinusal",
+    "NORM":  "Ritmo Sinusal Normal",
+    "MI":    "Infarto de Miocardio",
+    "STTC":  "Cambio de Onda ST/T",
+    "CD":    "Trastorno de Conducción",
+    "HYP":   "Hipertrofia",
+    "TWC":   "Cambio de Onda T",
+    "LBBB":  "Bloqueo de Rama Izquierda",
+    "RBBB":  "Bloqueo de Rama Derecha",
+    "PAC":   "Complejo Auricular Prematuro",
+    "PVC":   "Complejo Ventricular Prematuro",
 }
 
 _DESCRIPTIONS = {
-    "SR":    "Normal sinus rhythm — the heart beats regularly at 60–100 bpm with impulses from the SA node. No significant arrhythmia detected.",
-    "AFIB":  "Atrial fibrillation — chaotic electrical activity in the atria causes an irregular, often rapid rhythm. Increases stroke and heart failure risk.",
-    "STACH": "Sinus tachycardia — heart rate >100 bpm with a regular rhythm originating from the SA node. Often triggered by exercise, fever, or stress.",
-    "SBRAD": "Sinus bradycardia — heart rate <60 bpm with a regular sinus rhythm. Normal in athletes; may indicate conduction issues or medication effects in others.",
-    "NORM":  "Normal ECG — no clinically significant abnormality detected.",
-    "MI":    "Myocardial infarction — ST elevation or Q-wave changes indicating cardiac muscle damage from blocked coronary arteries.",
-    "STTC":  "ST/T-wave change — ischemia, electrolyte imbalances, or repolarization abnormalities.",
-    "CD":    "Conduction disturbance — delayed or blocked electrical propagation through the cardiac conduction system.",
-    "HYP":   "Hypertrophy — thickening of the heart muscle, commonly from chronic hypertension or valvular disease.",
-    "TWC":   "T-wave change — abnormal repolarization suggesting possible ischemia, electrolyte disturbance, or myocardial strain.",
-    "LBBB":  "Left bundle branch block — altered QRS morphology from delayed left-sided conduction.",
-    "RBBB":  "Right bundle branch block — widened QRS with right-sided conduction delay.",
-    "PAC":   "Premature atrial complex — early atrial impulse generating a premature beat.",
-    "PVC":   "Premature ventricular complex — wide QRS from an early ventricular impulse.",
+    "SR":    "Ritmo sinusal normal — el corazón late de forma regular a 60–100 lpm con impulsos del nodo SA. No se detecta arritmia significativa.",
+    "AFIB":  "Fibrilación auricular — la actividad eléctrica caótica en las aurículas produce un ritmo irregular, con frecuencia rápido. Aumenta el riesgo de ictus e insuficiencia cardíaca.",
+    "STACH": "Taquicardia sinusal — frecuencia cardíaca >100 lpm con ritmo regular originado en el nodo SA. Suele deberse a ejercicio, fiebre o estrés.",
+    "SBRAD": "Bradicardia sinusal — frecuencia cardíaca <60 lpm con ritmo sinusal regular. Normal en atletas; en otros puede indicar problemas de conducción o efecto de medicamentos.",
+    "NORM":  "ECG normal — sin anomalías clínicamente significativas.",
+    "MI":    "Infarto de miocardio — elevación del ST o cambios en la onda Q que indican daño del músculo cardíaco por arterias coronarias obstruidas.",
+    "STTC":  "Cambio de onda ST/T — isquemia, desequilibrios electrolíticos o anomalías de repolarización.",
+    "CD":    "Trastorno de conducción — propagación eléctrica retrasada o bloqueada en el sistema de conducción cardíaco.",
+    "HYP":   "Hipertrofia — engrosamiento del músculo cardíaco, comúnmente por hipertensión crónica o enfermedad valvular.",
+    "TWC":   "Cambio de onda T — repolarización anómala que sugiere posible isquemia, alteración electrolítica o sobrecarga miocárdica.",
+    "LBBB":  "Bloqueo de rama izquierda — morfología del QRS alterada por conducción izquierda retrasada.",
+    "RBBB":  "Bloqueo de rama derecha — QRS ensanchado con retraso de conducción derecho.",
+    "PAC":   "Complejo auricular prematuro — impulso auricular temprano que genera un latido prematuro.",
+    "PVC":   "Complejo ventricular prematuro — QRS ancho por un impulso ventricular temprano.",
 }
 
-# What clinical/waveform features are characteristic of each class.  This is the
-# "why" dictionary requested for the UI: it explains, in plain language, which
-# ECG features the model tends to rely on when it settles on a given verdict.
-# (These are the known morphological hallmarks of each rhythm — they help the
-# user interpret the Grad-CAM heat-map, which highlights *where* in the trace the
-# model concentrated.)
+# Características clínicas / de la señal propias de cada clase.  Este es el
+# diccionario del "por qué" para la interfaz: explica, en lenguaje sencillo, en
+# qué rasgos del ECG tiende a apoyarse el modelo al decidir un veredicto.  (Son
+# los rasgos morfológicos conocidos de cada ritmo — ayudan a interpretar el mapa
+# de calor Grad-CAM, que resalta *dónde* del trazado se concentró el modelo.)
 _KEY_FEATURES = {
     "SR": [
-        "Regular R-R intervals (even spacing between beats)",
-        "A clear, upright P wave before every QRS complex",
-        "Rate between 60 and 100 bpm",
-        "Consistent, narrow QRS morphology",
+        "Intervalos R-R regulares (espaciado uniforme entre latidos)",
+        "Onda P clara y positiva antes de cada complejo QRS",
+        "Frecuencia entre 60 y 100 lpm",
+        "Morfología del QRS estrecha y constante",
     ],
     "AFIB": [
-        "Irregularly irregular R-R intervals (no repeating pattern)",
-        "Absent P waves — replaced by chaotic fibrillatory (f) waves",
-        "Wavy, undulating baseline between QRS complexes",
-        "Often a rapid ventricular response",
+        "Intervalos R-R irregularmente irregulares (sin patrón repetitivo)",
+        "Ausencia de ondas P — reemplazadas por ondas de fibrilación (f) caóticas",
+        "Línea de base ondulante entre los complejos QRS",
+        "Con frecuencia, respuesta ventricular rápida",
     ],
     "STACH": [
-        "Fast rate (>100 bpm) with tightly packed beats",
-        "Regular R-R intervals despite the speed",
-        "Normal P wave preceding each QRS",
-        "Shortened T-P segment (less rest between beats)",
+        "Frecuencia rápida (>100 lpm) con latidos muy juntos",
+        "Intervalos R-R regulares pese a la velocidad",
+        "Onda P normal precediendo cada QRS",
+        "Segmento T-P acortado (menos reposo entre latidos)",
     ],
     "SBRAD": [
-        "Slow rate (<60 bpm) with widely spaced beats",
-        "Regular R-R intervals",
-        "Normal upright P wave before each QRS",
-        "Long, flat T-P segment (extended rest between beats)",
+        "Frecuencia lenta (<60 lpm) con latidos muy separados",
+        "Intervalos R-R regulares",
+        "Onda P normal y positiva antes de cada QRS",
+        "Segmento T-P largo y plano (reposo prolongado entre latidos)",
     ],
 }
 
@@ -590,14 +593,240 @@ def compute_gradcam(x_input: torch.Tensor, class_idx: int) -> list:
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024   # 50 MB
 
+# Create tables + seed the demo doctor (admin / admin) on startup.
+db.init_db()
+print("[OK] database ready at", db.DB_PATH)
+
 
 @app.after_request
 def _add_cors_headers(resp):
     """Allow the Flutter app (any origin/device) to call this API."""
     resp.headers["Access-Control-Allow-Origin"]  = "*"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     return resp
+
+
+@app.before_request
+def _handle_cors_preflight():
+    """Answer browser CORS preflight (OPTIONS) so the web build can call the API."""
+    if request.method == "OPTIONS":
+        return ("", 204)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Authentication — opaque bearer tokens in the Authorization header
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _bearer_token():
+    auth = request.headers.get("Authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return None
+
+
+def require_auth(fn):
+    """Route decorator: 401s unless a valid session token is present. Sets g.doctor."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        doctor = db.get_doctor_by_token(_bearer_token())
+        if doctor is None:
+            return jsonify({"error": "Not authenticated. Please log in."}), 401
+        g.doctor = doctor
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/auth/register", methods=["POST"])
+def auth_register():
+    data = request.get_json(silent=True) or {}
+    try:
+        doc = db.create_doctor(
+            data.get("username", ""), data.get("password", ""), data.get("name", ""),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    token = db.create_session(doc["id"])
+    return jsonify({"token": token, "doctor": db.doctor_public(doc)})
+
+
+@app.route("/auth/login", methods=["POST"])
+def auth_login():
+    data = request.get_json(silent=True) or {}
+    doc = db.verify_login(data.get("username", ""), data.get("password", ""))
+    if doc is None:
+        return jsonify({"error": "Invalid username or password."}), 401
+    token = db.create_session(doc["id"])
+    return jsonify({"token": token, "doctor": db.doctor_public(doc)})
+
+
+@app.route("/auth/logout", methods=["POST"])
+@require_auth
+def auth_logout():
+    db.delete_session(_bearer_token())
+    return jsonify({"ok": True})
+
+
+@app.route("/me")
+@require_auth
+def me():
+    return jsonify({"doctor": db.doctor_public(g.doctor)})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Patients
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/patients", methods=["GET"])
+@require_auth
+def patients_list():
+    return jsonify({"patients": db.list_patients(g.doctor["id"])})
+
+
+@app.route("/patients", methods=["POST"])
+@require_auth
+def patients_create():
+    d = request.get_json(silent=True) or {}
+    try:
+        patient = db.create_patient(
+            g.doctor["id"], d.get("name"), d.get("dob"), d.get("gender"), d.get("notes"),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"patient": patient})
+
+
+@app.route("/patients/<int:patient_id>", methods=["GET"])
+@require_auth
+def patient_detail(patient_id):
+    row = db.get_patient(patient_id, g.doctor["id"])
+    if row is None:
+        return jsonify({"error": "Patient not found."}), 404
+    return jsonify({
+        "patient": db.patient_public(row),
+        "records": db.list_records(patient_id),
+    })
+
+
+@app.route("/patients/<int:patient_id>", methods=["PUT"])
+@require_auth
+def patient_update(patient_id):
+    d = request.get_json(silent=True) or {}
+    try:
+        patient = db.update_patient(
+            patient_id, g.doctor["id"],
+            d.get("name"), d.get("dob"), d.get("gender"), d.get("notes"),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if patient is None:
+        return jsonify({"error": "Patient not found."}), 404
+    return jsonify({"patient": patient})
+
+
+@app.route("/patients/<int:patient_id>", methods=["DELETE"])
+@require_auth
+def patient_delete(patient_id):
+    if not db.delete_patient(patient_id, g.doctor["id"]):
+        return jsonify({"error": "Patient not found."}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/patients/<int:patient_id>/analyze", methods=["POST"])
+@require_auth
+def patient_analyze(patient_id):
+    """Run the model on an uploaded file and store the result for this patient.
+
+    De-duplicates by file hash: re-uploading the same file returns the stored
+    record (already_existed=True) instead of re-running the model.
+    """
+    if db.get_patient(patient_id, g.doctor["id"]) is None:
+        return jsonify({"error": "Patient not found."}), 404
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided."}), 400
+
+    uploaded = request.files["file"]
+    filename = uploaded.filename or ""
+    ext      = os.path.splitext(filename)[1].lower()
+    if ext not in ALL_EXTS:
+        return jsonify({
+            "error": f"Unsupported file type '{ext}'. "
+                     f"Accepted formats: {', '.join(sorted(ALL_EXTS))}"
+        }), 400
+
+    try:
+        file_bytes = uploaded.read()
+        fhash = db.file_hash(file_bytes)
+
+        existing = db.find_record_by_hash(patient_id, fhash)
+        if existing is not None:
+            rec = db.record_public(existing, include_full=True)
+            return jsonify({"record": rec, "already_existed": True})
+
+        result = run_prediction(file_bytes, ext, filename)
+        rec = db.create_record(patient_id, g.doctor["id"], filename, fhash, result)
+        return jsonify({"record": rec, "already_existed": False})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        traceback.print_exc()
+        return jsonify({"error": str(exc)}), 500
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Records — full result re-render + doctor notes/recommendations
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/records/<int:record_id>", methods=["GET"])
+@require_auth
+def record_get(record_id):
+    rec = db.get_record(record_id, g.doctor["id"])
+    if rec is None:
+        return jsonify({"error": "Record not found."}), 404
+    return jsonify({"record": rec})
+
+
+@app.route("/records/<int:record_id>/notes", methods=["PUT"])
+@require_auth
+def record_notes(record_id):
+    d = request.get_json(silent=True) or {}
+    rec = db.update_record_notes(record_id, g.doctor["id"], d.get("doctor_notes", ""))
+    if rec is None:
+        return jsonify({"error": "Record not found."}), 404
+    return jsonify({"record": rec})
+
+
+@app.route("/records/<int:record_id>/verdict", methods=["PUT"])
+@require_auth
+def record_verdict(record_id):
+    """Doctor confirms whether the model's prediction was correct.
+
+    Body: {"verdict": "correct"|"incorrect"|null, "true_label": "AFIB" (optional)}
+    """
+    d = request.get_json(silent=True) or {}
+    try:
+        rec = db.set_record_verdict(
+            record_id, g.doctor["id"], d.get("verdict"), d.get("true_label"),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    if rec is None:
+        return jsonify({"error": "Record not found."}), 404
+    return jsonify({"record": rec})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Dashboard — global aggregates enriched with class colours/names
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/dashboard", methods=["GET"])
+@require_auth
+def dashboard():
+    stats = db.dashboard_stats()
+    stats["class_names"]  = {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES}
+    stats["class_colors"] = {c: _COLORS.get(c, "#38bdf8") for c in CLASS_NAMES}
+    stats["class_order"]  = list(CLASS_NAMES)
+    return jsonify(stats)
 
 
 @app.route("/")
@@ -615,6 +844,91 @@ def health():
         "class_names": CLASS_NAMES,
         "device":      str(DEVICE),
     })
+
+
+def run_prediction(file_bytes: bytes, ext: str, filename: str) -> dict:
+    """
+    Core inference used by both /predict and the patient-linked analyse route.
+
+    Parses the file into a (12, 1000) tensor, runs the model, computes Grad-CAM,
+    and returns the full response dict.  Raises on unsupported types or parse
+    errors so callers can translate them into HTTP responses.
+    """
+    image_warning = None
+
+    if ext == ".dat":
+        x_tensor, raw_signal = parse_dat(file_bytes)
+    elif ext == ".mat":
+        x_tensor, raw_signal = parse_mat(file_bytes)
+    elif ext == ".pt":
+        x_tensor, raw_signal = parse_pt(file_bytes)
+    elif ext in DIGITISE_EXTS:
+        # Image / PDF path — digitise all 12 leads with ECGtizer.
+        try:
+            x_tensor, raw_signal = parse_image_ecgtizer(file_bytes, ext)
+            image_warning = (
+                "Este ECG se digitalizó desde una imagen/PDF con ECGtizer, asumiendo un "
+                f"formato clínico estándar {ECGTIZER_LAYOUT}. La calidad de extracción "
+                "depende de la resolución y calidad de impresión — verifica los trazados "
+                "contra el original antes de confiar en el resultado."
+            )
+        except RuntimeError:
+            # ECGtizer unavailable or couldn't digitise. Only fall back to the
+            # crude single-lead method if explicitly enabled; otherwise surface
+            # the actionable error to the user.
+            if IMAGE_FALLBACK_CENTROID:
+                x_tensor, raw_signal = parse_image(file_bytes)
+                image_warning = (
+                    "ECGtizer no pudo digitalizar esta imagen, así que se usó una "
+                    "aproximación de una sola derivación (un canal copiado a las 12). Esto "
+                    "NO es confiable — sube un archivo .pt / .mat / .dat para un resultado real."
+                )
+            else:
+                raise
+    else:
+        raise ValueError(f"Unsupported file type '{ext}'.")
+
+    # Add batch dimension → (1, 12, 1000)
+    x_input = x_tensor.unsqueeze(0).to(DEVICE)
+
+    with torch.no_grad():
+        logits   = model(x_input)
+        probs    = F.softmax(logits, dim=1).squeeze(0)
+        pred_idx = int(torch.argmax(probs).item())
+
+    pred_class = CLASS_NAMES[pred_idx]
+    confidence = float(probs[pred_idx].item())
+
+    class_probs = {CLASS_NAMES[i]: float(probs[i].item()) for i in range(N_CLASSES)}
+
+    # Grad-CAM importance curve for the winning class (0..1, length 1000)
+    gradcam = compute_gradcam(x_input, pred_idx)
+
+    LEAD_LABELS = ["I", "II", "III", "aVR", "aVL", "aVF",
+                   "V1", "V2", "V3", "V4", "V5", "V6"]
+    all_leads = {LEAD_LABELS[i]: raw_signal[i, :].tolist()
+                 for i in range(raw_signal.shape[0])}
+
+    response = {
+        "prediction":    pred_class,
+        "full_name":     _FULL_NAMES.get(pred_class, pred_class),
+        "description":   _DESCRIPTIONS.get(pred_class, ""),
+        "key_features":  _KEY_FEATURES.get(pred_class, []),
+        "color":         _COLORS.get(pred_class, "#38bdf8"),
+        "confidence":    confidence,
+        "class_probs":   class_probs,
+        "class_colors":  {c: _COLORS.get(c, "#38bdf8") for c in CLASS_NAMES},
+        "class_names":   {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES},
+        "all_leads":     all_leads,
+        "gradcam":       gradcam,
+        "gradcam_lead":  "II",
+        "filename":      filename,
+    }
+
+    if image_warning:
+        response["warning"] = image_warning
+
+    return response
 
 
 @app.route("/predict", methods=["POST"])
@@ -635,84 +949,8 @@ def predict():
         }), 400
 
     try:
-        file_bytes = uploaded.read()
-
-        image_warning = None
-
-        if ext == ".dat":
-            x_tensor, raw_signal = parse_dat(file_bytes)
-        elif ext == ".mat":
-            x_tensor, raw_signal = parse_mat(file_bytes)
-        elif ext == ".pt":
-            x_tensor, raw_signal = parse_pt(file_bytes)
-        elif ext in DIGITISE_EXTS:
-            # Image / PDF path — digitise all 12 leads with ECGtizer.
-            try:
-                x_tensor, raw_signal = parse_image_ecgtizer(file_bytes, ext)
-                image_warning = (
-                    "This ECG was digitised from an image/PDF with ECGtizer, assuming a "
-                    f"standard {ECGTIZER_LAYOUT} clinical layout. Extraction quality depends "
-                    "on image resolution and print quality — double-check the traces against "
-                    "the source before relying on the result."
-                )
-            except RuntimeError:
-                # ECGtizer unavailable or couldn't digitise. Only fall back to the
-                # crude single-lead method if explicitly enabled; otherwise surface
-                # the actionable error to the user.
-                if IMAGE_FALLBACK_CENTROID:
-                    x_tensor, raw_signal = parse_image(file_bytes)
-                    image_warning = (
-                        "ECGtizer could not digitise this image, so a rough single-lead "
-                        "fallback was used (one channel copied across all 12 leads). This is "
-                        "NOT reliable — upload a raw .pt / .mat / .dat file for a real result."
-                    )
-                else:
-                    raise
-        else:
-            return jsonify({"error": f"Unsupported file type '{ext}'."}), 400
-
-        # Add batch dimension → (1, 12, 1000)
-        x_input = x_tensor.unsqueeze(0).to(DEVICE)
-
-        with torch.no_grad():
-            logits   = model(x_input)
-            probs    = F.softmax(logits, dim=1).squeeze(0)
-            pred_idx = int(torch.argmax(probs).item())
-
-        pred_class = CLASS_NAMES[pred_idx]
-        confidence = float(probs[pred_idx].item())
-
-        class_probs = {CLASS_NAMES[i]: float(probs[i].item()) for i in range(N_CLASSES)}
-
-        # Grad-CAM importance curve for the winning class (0..1, length 1000)
-        gradcam = compute_gradcam(x_input, pred_idx)
-
-        LEAD_LABELS = ["I", "II", "III", "aVR", "aVL", "aVF",
-                       "V1", "V2", "V3", "V4", "V5", "V6"]
-        all_leads = {LEAD_LABELS[i]: raw_signal[i, :].tolist()
-                     for i in range(raw_signal.shape[0])}
-
-        response = {
-            "prediction":    pred_class,
-            "full_name":     _FULL_NAMES.get(pred_class, pred_class),
-            "description":   _DESCRIPTIONS.get(pred_class, ""),
-            "key_features":  _KEY_FEATURES.get(pred_class, []),
-            "color":         _COLORS.get(pred_class, "#38bdf8"),
-            "confidence":    confidence,
-            "class_probs":   class_probs,
-            "class_colors":  {c: _COLORS.get(c, "#38bdf8") for c in CLASS_NAMES},
-            "class_names":   {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES},
-            "all_leads":     all_leads,
-            "gradcam":       gradcam,
-            "gradcam_lead":  "II",
-            "filename":      filename,
-        }
-
-        if image_warning:
-            response["warning"] = image_warning
-
+        response = run_prediction(uploaded.read(), ext, filename)
         return jsonify(response)
-
     except Exception as exc:
         traceback.print_exc()
         return jsonify({"error": str(exc)}), 500

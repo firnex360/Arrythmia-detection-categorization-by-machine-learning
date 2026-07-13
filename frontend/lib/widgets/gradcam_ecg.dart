@@ -28,7 +28,7 @@ class GradCamEcg extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('Lead $leadLabel',
+            Text('Derivación $leadLabel',
                 style: const TextStyle(
                     color: AppColors.muted,
                     fontWeight: FontWeight.w600,
@@ -64,7 +64,7 @@ class _HeatLegend extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('low',
+        const Text('bajo',
             style: TextStyle(color: AppColors.muted, fontSize: 11)),
         const SizedBox(width: 6),
         Container(
@@ -83,7 +83,7 @@ class _HeatLegend extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        const Text('high',
+        const Text('alto',
             style: TextStyle(color: AppColors.muted, fontSize: 11)),
       ],
     );

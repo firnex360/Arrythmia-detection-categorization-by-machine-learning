@@ -99,4 +99,280 @@ class PredictionResult {
       warning: json['warning'] as String?,
     );
   }
+
+  static Color parseColor(String? hex, [Color fallback = const Color(0xFF38BDF8)]) =>
+      _parseColor(hex, fallback);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  Clinical records — doctors, patients, ECG history, dashboard
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// The logged-in doctor.
+class Doctor {
+  final int id;
+  final String username;
+  final String name;
+  Doctor({required this.id, required this.username, required this.name});
+
+  factory Doctor.fromJson(Map<String, dynamic> j) => Doctor(
+        id: (j['id'] as num).toInt(),
+        username: '${j['username'] ?? ''}',
+        name: '${j['name'] ?? j['username'] ?? ''}',
+      );
+}
+
+/// A patient owned by the current doctor.
+class Patient {
+  final int id;
+  final String name;
+  final String? dob; // ISO YYYY-MM-DD
+  final int? age; // computed by the backend from dob
+  final String? gender; // 'F' | 'M' | 'Other'
+  final String? notes;
+  final int recordCount;
+
+  Patient({
+    required this.id,
+    required this.name,
+    this.dob,
+    this.age,
+    this.gender,
+    this.notes,
+    this.recordCount = 0,
+  });
+
+  factory Patient.fromJson(Map<String, dynamic> j) => Patient(
+        id: (j['id'] as num).toInt(),
+        name: '${j['name'] ?? ''}',
+        dob: j['dob'] as String?,
+        age: (j['age'] as num?)?.toInt(),
+        gender: j['gender'] as String?,
+        notes: j['notes'] as String?,
+        recordCount: (j['record_count'] as num?)?.toInt() ?? 0,
+      );
+
+  String get genderLabel => switch (gender) {
+        'F' => 'Femenino',
+        'M' => 'Masculino',
+        'Other' => 'Otro',
+        _ => '—',
+      };
+}
+
+/// One ECG analysis stored against a patient.
+class EcgRecord {
+  final int id;
+  final int patientId;
+  final String filename;
+  final String prediction;
+  final double confidence;
+  final Map<String, double> classProbs;
+  final String? doctorNotes;
+  final String createdAt;
+
+  /// Doctor's assessment: 'correct' | 'incorrect' | null (unreviewed).
+  final String? verdict;
+
+  /// Actual class when the doctor marked the prediction incorrect.
+  final String? trueLabel;
+
+  /// Full prediction payload (Grad-CAM, leads, description …) — present when the
+  /// record was fetched in detail via `/records/<id>`.
+  final PredictionResult? result;
+
+  EcgRecord({
+    required this.id,
+    required this.patientId,
+    required this.filename,
+    required this.prediction,
+    required this.confidence,
+    required this.classProbs,
+    required this.doctorNotes,
+    required this.createdAt,
+    this.verdict,
+    this.trueLabel,
+    this.result,
+  });
+
+  factory EcgRecord.fromJson(Map<String, dynamic> j) {
+    final probs = <String, double>{};
+    (j['class_probs'] as Map?)?.forEach((k, v) {
+      probs['$k'] = (v as num).toDouble();
+    });
+    final full = j['result'];
+    return EcgRecord(
+      id: (j['id'] as num).toInt(),
+      patientId: (j['patient_id'] as num).toInt(),
+      filename: '${j['filename'] ?? ''}',
+      prediction: '${j['prediction'] ?? '—'}',
+      confidence: (j['confidence'] as num?)?.toDouble() ?? 0.0,
+      classProbs: probs,
+      doctorNotes: j['doctor_notes'] as String?,
+      verdict: j['verdict'] as String?,
+      trueLabel: j['true_label'] as String?,
+      createdAt: '${j['created_at'] ?? ''}',
+      result: (full is Map<String, dynamic> && full.isNotEmpty)
+          ? PredictionResult.fromJson(full)
+          : null,
+    );
+  }
+}
+
+/// Aggregate stats for the whole program (dashboard).
+class DashboardData {
+  final int totalDoctors;
+  final int totalPatients;
+  final int totalRecords;
+  final List<String> classOrder;
+  final Map<String, String> classNames;
+  final Map<String, Color> classColors;
+  final Map<String, int> byClass;
+  final Map<String, double> avgConfidence;
+  final List<GroupCounts> byGender;
+  final List<GroupCounts> byAge;
+  final AccuracyStats accuracy;
+  final List<TimelinePoint> timeline;
+
+  DashboardData({
+    required this.totalDoctors,
+    required this.totalPatients,
+    required this.totalRecords,
+    required this.classOrder,
+    required this.classNames,
+    required this.classColors,
+    required this.byClass,
+    required this.avgConfidence,
+    required this.byGender,
+    required this.byAge,
+    required this.accuracy,
+    required this.timeline,
+  });
+
+  factory DashboardData.fromJson(Map<String, dynamic> j) {
+    final totals = (j['totals'] as Map?) ?? {};
+    final order = (j['class_order'] as List?)?.map((e) => '$e').toList() ?? const [];
+
+    final names = <String, String>{};
+    (j['class_names'] as Map?)?.forEach((k, v) => names['$k'] = '$v');
+
+    final colors = <String, Color>{};
+    (j['class_colors'] as Map?)?.forEach(
+        (k, v) => colors['$k'] = PredictionResult.parseColor('$v'));
+
+    final byClass = <String, int>{};
+    (j['by_class'] as Map?)?.forEach((k, v) => byClass['$k'] = (v as num).toInt());
+
+    final avg = <String, double>{};
+    (j['avg_confidence'] as Map?)?.forEach((k, v) => avg['$k'] = (v as num).toDouble());
+
+    List<GroupCounts> parseGroups(dynamic raw, String labelKey) {
+      if (raw is! List) return const [];
+      return raw.map((e) {
+        final m = e as Map<String, dynamic>;
+        final counts = <String, int>{};
+        (m['counts'] as Map?)?.forEach((k, v) => counts['$k'] = (v as num).toInt());
+        return GroupCounts(
+          label: '${m[labelKey] ?? ''}',
+          counts: counts,
+          total: (m['total'] as num?)?.toInt() ?? 0,
+        );
+      }).toList();
+    }
+
+    return DashboardData(
+      totalDoctors: (totals['doctors'] as num?)?.toInt() ?? 0,
+      totalPatients: (totals['patients'] as num?)?.toInt() ?? 0,
+      totalRecords: (totals['records'] as num?)?.toInt() ?? 0,
+      classOrder: order,
+      classNames: names,
+      classColors: colors,
+      byClass: byClass,
+      avgConfidence: avg,
+      byGender: parseGroups(j['by_gender'], 'gender'),
+      byAge: parseGroups(j['by_age'], 'group'),
+      accuracy: AccuracyStats.fromJson(
+          (j['accuracy'] as Map?)?.cast<String, dynamic>() ?? const {}),
+      timeline: ((j['timeline'] as List?) ?? const [])
+          .map((e) => TimelinePoint.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+/// A named group (a gender or an age band) with per-class counts.
+class GroupCounts {
+  final String label;
+  final Map<String, int> counts;
+  final int total;
+  GroupCounts({required this.label, required this.counts, required this.total});
+}
+
+/// One day on the timeline: how many ECGs were analysed, split by class.
+class TimelinePoint {
+  final String date; // YYYY-MM-DD
+  final int total;
+  final Map<String, int> counts;
+  TimelinePoint({required this.date, required this.total, required this.counts});
+
+  factory TimelinePoint.fromJson(Map<String, dynamic> j) {
+    final counts = <String, int>{};
+    (j['counts'] as Map?)?.forEach((k, v) => counts['$k'] = (v as num).toInt());
+    return TimelinePoint(
+      date: '${j['date'] ?? ''}',
+      total: (j['total'] as num?)?.toInt() ?? 0,
+      counts: counts,
+    );
+  }
+}
+
+/// How well the model does, according to the doctors' verdicts.
+class AccuracyStats {
+  final int reviewed;
+  final int correct;
+  final int unreviewed;
+  final double? accuracy; // null when nothing reviewed yet
+  final Map<String, ClassAccuracy> byClass;
+  final Map<String, int> confusion; // 'PRED→ACTUAL' -> count
+
+  AccuracyStats({
+    required this.reviewed,
+    required this.correct,
+    required this.unreviewed,
+    required this.accuracy,
+    required this.byClass,
+    required this.confusion,
+  });
+
+  factory AccuracyStats.fromJson(Map<String, dynamic> j) {
+    final overall = (j['overall'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final byClass = <String, ClassAccuracy>{};
+    (j['by_class'] as Map?)?.forEach((k, v) {
+      byClass['$k'] = ClassAccuracy.fromJson((v as Map).cast<String, dynamic>());
+    });
+    final confusion = <String, int>{};
+    (j['confusion'] as Map?)?.forEach((k, v) => confusion['$k'] = (v as num).toInt());
+    return AccuracyStats(
+      reviewed: (overall['reviewed'] as num?)?.toInt() ?? 0,
+      correct: (overall['correct'] as num?)?.toInt() ?? 0,
+      unreviewed: (overall['unreviewed'] as num?)?.toInt() ?? 0,
+      accuracy: (overall['accuracy'] as num?)?.toDouble(),
+      byClass: byClass,
+      confusion: confusion,
+    );
+  }
+}
+
+class ClassAccuracy {
+  final int reviewed;
+  final int correct;
+  final double? accuracy;
+  ClassAccuracy(
+      {required this.reviewed, required this.correct, required this.accuracy});
+
+  factory ClassAccuracy.fromJson(Map<String, dynamic> j) => ClassAccuracy(
+        reviewed: (j['reviewed'] as num?)?.toInt() ?? 0,
+        correct: (j['correct'] as num?)?.toInt() ?? 0,
+        accuracy: (j['accuracy'] as num?)?.toDouble(),
+      );
 }
