@@ -201,6 +201,13 @@ class ApiService {
         .timeout(const Duration(seconds: 15));
     return DashboardData.fromJson(_decode(resp));
   }
+
+  static Future<RiskOverview> risk() async {
+    final resp = await http
+        .get(_u('/risk'), headers: _authHeader)
+        .timeout(const Duration(seconds: 15));
+    return RiskOverview.fromJson(_decode(resp));
+  }
 }
 
 class ApiException implements Exception {

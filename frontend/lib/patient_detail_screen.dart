@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'api_service.dart';
 import 'ecg_picker.dart';
+import 'individual_widgets.dart';
 import 'models.dart';
 import 'patient_form.dart';
 import 'result_screen.dart';
@@ -254,6 +255,19 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     header,
+                    if (_records.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      CurrentDiagnosisCard(
+                        record: _records.first,
+                        onExplain: () => _openRecord(_records.first),
+                      ),
+                      const SizedBox(height: 16),
+                      EvolutionCard(records: _records),
+                      if (_records.length >= 2) ...[
+                        const SizedBox(height: 16),
+                        ComparisonCard(records: _records),
+                      ],
+                    ],
                     const SizedBox(height: 18),
                     Text('Historial de ECG (${_records.length})',
                         style: const TextStyle(

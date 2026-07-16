@@ -453,7 +453,8 @@ def dashboard_stats() -> dict:
     conf_sum = {}
     by_gender = {}      # gender -> {code: count}
     by_age = {}         # group  -> {code: count}
-    by_date = {}        # 'YYYY-MM-DD' -> {code: count}
+    by_day = {}         # 'YYYY-MM-DD'    -> {code: count}
+    by_hour = {}        # 'YYYY-MM-DDTHH' -> {code: count}
 
     # Accuracy from the doctor's verdicts.
     acc_by_class = {}   # predicted code -> [reviewed, correct]
@@ -475,9 +476,11 @@ def dashboard_stats() -> dict:
         grp = _age_group(compute_age(r["dob"]))
         _bump(by_age, grp, code)
 
-        day = (r["created_at"] or "")[:10]
-        if day:
-            _bump(by_date, day, code)
+        created = r["created_at"] or ""
+        if len(created) >= 10:
+            _bump(by_day, created[:10], code)        # YYYY-MM-DD
+        if len(created) >= 13:
+            _bump(by_hour, created[:13], code)        # YYYY-MM-DDTHH
 
         verdict = r["verdict"]
         if verdict in ("correct", "incorrect"):
@@ -514,17 +517,21 @@ def dashboard_stats() -> dict:
         "confusion": confusion,
     }
 
-    timeline = [
-        {"date": d, "counts": by_date[d], "total": sum(by_date[d].values())}
-        for d in sorted(by_date)
-    ]
+    def _series(bucket):
+        return [
+            {"date": k, "counts": bucket[k], "total": sum(bucket[k].values())}
+            for k in sorted(bucket)
+        ]
+
+    timelines = {"day": _series(by_day), "hour": _series(by_hour)}
 
     return {
         "totals": totals,
         "by_class": by_class,
         "avg_confidence": avg_conf,
         "accuracy": accuracy,
-        "timeline": timeline,
+        "timeline": timelines["day"],   # back-compat
+        "timelines": timelines,
         "by_gender": [
             {"gender": g, "counts": by_gender[g], "total": sum(by_gender[g].values())}
             for g in sorted(by_gender)
@@ -533,4 +540,119 @@ def dashboard_stats() -> dict:
             {"group": g, "counts": by_age[g], "total": sum(by_age[g].values())}
             for g in age_order if g in by_age
         ],
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Risk & alerts — prioritise the doctor's patients by the model's findings
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Rhythms considered "normal"; everything else counts as abnormal for triage.
+NORMAL_CLASSES = {"SR", "NORM"}
+
+# Clinical severity weight per class (higher = more urgent). Tuned for the 4
+# classes the model handles; unknown abnormal classes default to 2.
+_RISK_WEIGHT = {"AFIB": 3.0, "STACH": 2.0, "SBRAD": 2.0, "SR": 0.0, "NORM": 0.0}
+
+
+def _risk_level(score):
+    if score >= 2.4:
+        return "alto"
+    if score >= 1.2:
+        return "medio"
+    if score > 0:
+        return "bajo"
+    return "normal"
+
+
+def risk_overview(doctor_id: int) -> dict:
+    """
+    Triage view for one doctor: patients ranked by risk (based on their latest
+    ECG), recent abnormal findings, and abnormal ECGs still awaiting the doctor's
+    confirmation (pending follow-up).
+    """
+    with _conn() as conn:
+        patients = conn.execute(
+            "SELECT * FROM patients WHERE doctor_id = ?", (doctor_id,)
+        ).fetchall()
+
+        recs = conn.execute(
+            """
+            SELECT r.*, p.name AS patient_name, p.dob AS dob, p.gender AS gender
+            FROM records r
+            JOIN patients p ON p.id = r.patient_id
+            WHERE p.doctor_id = ?
+            ORDER BY r.created_at DESC, r.id DESC
+            """,
+            (doctor_id,),
+        ).fetchall()
+
+    # Group records by patient (already newest-first).
+    by_patient = {}
+    for r in recs:
+        by_patient.setdefault(r["patient_id"], []).append(r)
+
+    def _abnormal(code):
+        return code is not None and code not in NORMAL_CLASSES
+
+    prioritized = []
+    for p in patients:
+        rlist = by_patient.get(p["id"], [])
+        total = len(rlist)
+        abnormal_count = sum(1 for r in rlist if _abnormal(r["prediction"]))
+        latest = rlist[0] if rlist else None
+
+        if latest is not None:
+            code = latest["prediction"]
+            conf = latest["confidence"] or 0.0
+            weight = _RISK_WEIGHT.get(code, 2.0 if _abnormal(code) else 0.0)
+            score = weight * (0.5 + 0.5 * conf)   # scale by confidence
+            pending = latest["verdict"] is None and _abnormal(code)
+        else:
+            code, conf, score, pending = None, 0.0, 0.0, False
+
+        prioritized.append({
+            "patient_id": p["id"],
+            "name": p["name"],
+            "age": compute_age(p["dob"]),
+            "gender": p["gender"],
+            "total_ecgs": total,
+            "abnormal_count": abnormal_count,
+            "latest_prediction": code,
+            "latest_confidence": conf,
+            "latest_date": latest["created_at"] if latest else None,
+            "pending_review": pending,
+            "risk_score": round(score, 3),
+            "risk_level": _risk_level(score),
+        })
+
+    prioritized.sort(key=lambda x: x["risk_score"], reverse=True)
+
+    new_abnormal = [
+        {
+            "record_id": r["id"],
+            "patient_id": r["patient_id"],
+            "name": r["patient_name"],
+            "prediction": r["prediction"],
+            "confidence": r["confidence"] or 0.0,
+            "created_at": r["created_at"],
+            "verdict": r["verdict"],
+        }
+        for r in recs if _abnormal(r["prediction"])
+    ][:12]
+
+    pending_followup = [a for a in new_abnormal if a["verdict"] is None]
+
+    counts = {
+        "alto":   sum(1 for x in prioritized if x["risk_level"] == "alto"),
+        "medio":  sum(1 for x in prioritized if x["risk_level"] == "medio"),
+        "bajo":   sum(1 for x in prioritized if x["risk_level"] == "bajo"),
+        "normal": sum(1 for x in prioritized if x["risk_level"] == "normal"),
+    }
+
+    return {
+        "counts": counts,
+        "prioritized": prioritized,
+        "new_abnormal": new_abnormal,
+        "pending_followup": pending_followup,
     }

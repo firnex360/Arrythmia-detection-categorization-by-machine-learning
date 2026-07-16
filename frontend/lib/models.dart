@@ -232,7 +232,8 @@ class DashboardData {
   final List<GroupCounts> byGender;
   final List<GroupCounts> byAge;
   final AccuracyStats accuracy;
-  final List<TimelinePoint> timeline;
+  final List<TimelinePoint> timelineDay;
+  final List<TimelinePoint> timelineHour;
 
   DashboardData({
     required this.totalDoctors,
@@ -246,7 +247,8 @@ class DashboardData {
     required this.byGender,
     required this.byAge,
     required this.accuracy,
-    required this.timeline,
+    required this.timelineDay,
+    required this.timelineHour,
   });
 
   factory DashboardData.fromJson(Map<String, dynamic> j) {
@@ -293,10 +295,19 @@ class DashboardData {
       byAge: parseGroups(j['by_age'], 'group'),
       accuracy: AccuracyStats.fromJson(
           (j['accuracy'] as Map?)?.cast<String, dynamic>() ?? const {}),
-      timeline: ((j['timeline'] as List?) ?? const [])
-          .map((e) => TimelinePoint.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      timelineDay: _parseTimeline(j, 'day'),
+      timelineHour: _parseTimeline(j, 'hour'),
     );
+  }
+
+  static List<TimelinePoint> _parseTimeline(Map<String, dynamic> j, String key) {
+    final tls = j['timelines'];
+    final raw = (tls is Map && tls[key] is List)
+        ? tls[key] as List
+        : (key == 'day' ? (j['timeline'] as List? ?? const []) : const []);
+    return raw
+        .map((e) => TimelinePoint.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }
 
@@ -374,5 +385,127 @@ class ClassAccuracy {
         reviewed: (j['reviewed'] as num?)?.toInt() ?? 0,
         correct: (j['correct'] as num?)?.toInt() ?? 0,
         accuracy: (j['accuracy'] as num?)?.toDouble(),
+      );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  Risk & alerts
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Triage overview for the doctor's own patients.
+class RiskOverview {
+  final Map<String, int> counts; // level -> count (alto/medio/bajo/normal)
+  final List<RiskPatient> prioritized;
+  final List<AbnormalEcg> newAbnormal;
+  final List<AbnormalEcg> pendingFollowup;
+  final Map<String, String> classNames;
+  final Map<String, Color> classColors;
+
+  RiskOverview({
+    required this.counts,
+    required this.prioritized,
+    required this.newAbnormal,
+    required this.pendingFollowup,
+    required this.classNames,
+    required this.classColors,
+  });
+
+  factory RiskOverview.fromJson(Map<String, dynamic> j) {
+    final counts = <String, int>{};
+    (j['counts'] as Map?)?.forEach((k, v) => counts['$k'] = (v as num).toInt());
+    final names = <String, String>{};
+    (j['class_names'] as Map?)?.forEach((k, v) => names['$k'] = '$v');
+    final colors = <String, Color>{};
+    (j['class_colors'] as Map?)?.forEach(
+        (k, v) => colors['$k'] = PredictionResult.parseColor('$v'));
+    List<T> parse<T>(String key, T Function(Map<String, dynamic>) f) =>
+        ((j[key] as List?) ?? const [])
+            .map((e) => f(e as Map<String, dynamic>))
+            .toList();
+    return RiskOverview(
+      counts: counts,
+      prioritized: parse('prioritized', RiskPatient.fromJson),
+      newAbnormal: parse('new_abnormal', AbnormalEcg.fromJson),
+      pendingFollowup: parse('pending_followup', AbnormalEcg.fromJson),
+      classNames: names,
+      classColors: colors,
+    );
+  }
+}
+
+/// A patient ranked by risk (from their latest ECG).
+class RiskPatient {
+  final int patientId;
+  final String name;
+  final int? age;
+  final String? gender;
+  final int totalEcgs;
+  final int abnormalCount;
+  final String? latestPrediction;
+  final double latestConfidence;
+  final String? latestDate;
+  final bool pendingReview;
+  final double riskScore;
+  final String riskLevel; // 'alto' | 'medio' | 'bajo' | 'normal'
+
+  RiskPatient({
+    required this.patientId,
+    required this.name,
+    required this.age,
+    required this.gender,
+    required this.totalEcgs,
+    required this.abnormalCount,
+    required this.latestPrediction,
+    required this.latestConfidence,
+    required this.latestDate,
+    required this.pendingReview,
+    required this.riskScore,
+    required this.riskLevel,
+  });
+
+  factory RiskPatient.fromJson(Map<String, dynamic> j) => RiskPatient(
+        patientId: (j['patient_id'] as num).toInt(),
+        name: '${j['name'] ?? ''}',
+        age: (j['age'] as num?)?.toInt(),
+        gender: j['gender'] as String?,
+        totalEcgs: (j['total_ecgs'] as num?)?.toInt() ?? 0,
+        abnormalCount: (j['abnormal_count'] as num?)?.toInt() ?? 0,
+        latestPrediction: j['latest_prediction'] as String?,
+        latestConfidence: (j['latest_confidence'] as num?)?.toDouble() ?? 0.0,
+        latestDate: j['latest_date'] as String?,
+        pendingReview: j['pending_review'] == true,
+        riskScore: (j['risk_score'] as num?)?.toDouble() ?? 0.0,
+        riskLevel: '${j['risk_level'] ?? 'normal'}',
+      );
+}
+
+/// A recent abnormal ECG for the alerts lists.
+class AbnormalEcg {
+  final int recordId;
+  final int patientId;
+  final String name;
+  final String prediction;
+  final double confidence;
+  final String createdAt;
+  final String? verdict;
+
+  AbnormalEcg({
+    required this.recordId,
+    required this.patientId,
+    required this.name,
+    required this.prediction,
+    required this.confidence,
+    required this.createdAt,
+    required this.verdict,
+  });
+
+  factory AbnormalEcg.fromJson(Map<String, dynamic> j) => AbnormalEcg(
+        recordId: (j['record_id'] as num).toInt(),
+        patientId: (j['patient_id'] as num).toInt(),
+        name: '${j['name'] ?? ''}',
+        prediction: '${j['prediction'] ?? '—'}',
+        confidence: (j['confidence'] as num?)?.toDouble() ?? 0.0,
+        createdAt: '${j['created_at'] ?? ''}',
+        verdict: j['verdict'] as String?,
       );
 }

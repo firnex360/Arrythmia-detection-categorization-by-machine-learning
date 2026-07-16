@@ -18,6 +18,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   DashboardData? _data;
   String? _error;
+  String _granularity = 'day'; // 'day' | 'hour' for the timeline chart
 
   @override
   void initState() {
@@ -43,7 +44,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Panel general')),
+      appBar: AppBar(title: const Text('Dashboard Poblacional')),
       body: RefreshIndicator(onRefresh: _load, child: _body()),
     );
   }
@@ -191,23 +192,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       _Panel(
         title: 'ECG a lo largo del tiempo',
-        subtitle: 'Cuántos ECG se analizaron por día, por tipo de arritmia.',
-        child: d.timeline.isEmpty
-            ? const _Empty('Sin actividad registrada.')
-            : SimpleLineChart(
-                xLabels: [
-                  for (final p in d.timeline)
-                    p.date.length >= 10 ? p.date.substring(5) : p.date
-                ],
-                series: [
-                  for (final code in present)
-                    LineSeries(
-                      code,
-                      _colorFor(code),
-                      [for (final p in d.timeline) (p.counts[code] ?? 0).toDouble()],
-                    ),
-                ],
-              ),
+        subtitle: 'Volumen de ECG por ${_granularity == 'hour' ? 'hora' : 'día'}, '
+            'segmentado por tipo de arritmia.',
+        child: _TimelineSection(
+          day: d.timelineDay,
+          hour: d.timelineHour,
+          granularity: _granularity,
+          onGranularity: (g) => setState(() => _granularity = g),
+          classes: present,
+          colorFor: _colorFor,
+        ),
       ),
       _AccuracyPanel(
         accuracy: d.accuracy,
@@ -290,6 +284,82 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           if (i < cols - 1) const SizedBox(width: 16),
         ],
+      ],
+    );
+  }
+}
+
+/// Timeline chart with a Horas/Días granularity switch.
+class _TimelineSection extends StatelessWidget {
+  final List<TimelinePoint> day;
+  final List<TimelinePoint> hour;
+  final String granularity;
+  final ValueChanged<String> onGranularity;
+  final List<String> classes;
+  final Color Function(String) colorFor;
+
+  const _TimelineSection({
+    required this.day,
+    required this.hour,
+    required this.granularity,
+    required this.onGranularity,
+    required this.classes,
+    required this.colorFor,
+  });
+
+  String _fmt(String date) {
+    // day: 'YYYY-MM-DD' -> 'MM-DD' ; hour: 'YYYY-MM-DDTHH' -> 'DD HH:00'
+    if (date.contains('T')) {
+      final parts = date.split('T');
+      final d = parts[0].length >= 10 ? parts[0].substring(8) : parts[0];
+      return '$d ${parts.length > 1 ? parts[1] : ''}:00';
+    }
+    return date.length >= 10 ? date.substring(5) : date;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final series = granularity == 'hour' ? hour : day;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                  value: 'hour',
+                  label: Text('Horas'),
+                  icon: Icon(Icons.schedule, size: 16)),
+              ButtonSegment(
+                  value: 'day',
+                  label: Text('Días'),
+                  icon: Icon(Icons.calendar_today, size: 15)),
+            ],
+            selected: {granularity},
+            onSelectionChanged: (s) => onGranularity(s.first),
+            style: ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              textStyle: WidgetStateProperty.all(const TextStyle(fontSize: 12)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (series.isEmpty)
+          const _Empty('Sin actividad en esta granularidad.')
+        else
+          SimpleLineChart(
+            xLabels: [for (final p in series) _fmt(p.date)],
+            series: [
+              for (final code in classes)
+                LineSeries(
+                  code,
+                  colorFor(code),
+                  [for (final p in series) (p.counts[code] ?? 0).toDouble()],
+                ),
+            ],
+          ),
       ],
     );
   }

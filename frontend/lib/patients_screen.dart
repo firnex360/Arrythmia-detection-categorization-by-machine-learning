@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api_service.dart';
 import 'dashboard_screen.dart';
 import 'login_screen.dart';
+import 'risk_screen.dart';
 import 'models.dart';
 import 'patient_detail_screen.dart';
 import 'patient_form.dart';
@@ -70,7 +71,14 @@ class _PatientsScreenState extends State<PatientsScreen> {
         title: const Text('Mis pacientes'),
         actions: [
           IconButton(
-            tooltip: 'Panel / Dashboard',
+            tooltip: 'Riesgo y alertas',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RiskScreen()),
+            ),
+            icon: const Icon(Icons.warning_amber_rounded),
+          ),
+          IconButton(
+            tooltip: 'Dashboard poblacional',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const DashboardScreen()),
             ),

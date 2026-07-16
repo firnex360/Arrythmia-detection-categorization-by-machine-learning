@@ -87,7 +87,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ECG · Ingreso'),
         actions: [
           IconButton(
             tooltip: 'Servidor',
@@ -115,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ).let((w) => Center(child: w)),
               const SizedBox(height: 18),
               Text(
-                _registerMode ? 'Crear cuenta de doctor' : 'Bienvenido, doctor',
+                _registerMode ? 'Crear cuenta de doctor' : '¡Bienvenido, Doctor!',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontSize: 22,

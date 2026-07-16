@@ -819,14 +819,29 @@ def record_verdict(record_id):
 # Dashboard — global aggregates enriched with class colours/names
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _class_meta():
+    return {
+        "class_names":  {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES},
+        "class_colors": {c: _COLORS.get(c, "#38bdf8") for c in CLASS_NAMES},
+        "class_order":  list(CLASS_NAMES),
+    }
+
+
 @app.route("/dashboard", methods=["GET"])
 @require_auth
 def dashboard():
     stats = db.dashboard_stats()
-    stats["class_names"]  = {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES}
-    stats["class_colors"] = {c: _COLORS.get(c, "#38bdf8") for c in CLASS_NAMES}
-    stats["class_order"]  = list(CLASS_NAMES)
+    stats.update(_class_meta())
     return jsonify(stats)
+
+
+@app.route("/risk", methods=["GET"])
+@require_auth
+def risk():
+    """Risk & alerts triage for the logged-in doctor's patients."""
+    data = db.risk_overview(g.doctor["id"])
+    data.update(_class_meta())
+    return jsonify(data)
 
 
 @app.route("/")
