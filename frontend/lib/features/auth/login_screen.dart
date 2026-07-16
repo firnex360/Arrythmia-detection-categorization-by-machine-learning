@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'app_shell.dart';
-import 'config.dart';
-import 'theme.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/features/shell/app_shell.dart';
+import 'package:frontend/core/config.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Doctor sign-in / sign-up. On success, replaces itself with the patients list.
 class LoginScreen extends StatefulWidget {

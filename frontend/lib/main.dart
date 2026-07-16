@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'login_screen.dart';
-import 'theme.dart';
+import 'package:frontend/features/auth/login_screen.dart';
+import 'package:frontend/core/theme.dart';
 
 void main() {
   runApp(const EcgApp());

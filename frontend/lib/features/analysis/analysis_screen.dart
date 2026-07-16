@@ -1,12 +1,12 @@
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'ecg_picker.dart';
-import 'models.dart';
-import 'patient_form.dart';
-import 'result_screen.dart';
-import 'theme.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/features/analysis/ecg_picker.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/features/patients/patient_form.dart';
+import 'package:frontend/features/results/result_screen.dart';
+import 'package:frontend/core/theme.dart';
 
 /// The doctor's first action: import an ECG file, then attach it to a patient
 /// (existing or newly created) and run the analysis.

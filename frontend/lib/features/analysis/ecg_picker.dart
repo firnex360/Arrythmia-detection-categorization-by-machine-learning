@@ -1,7 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
-import 'config.dart';
+import 'package:frontend/core/config.dart';
 
 /// A file the user picked to analyse: its bytes and original name.
 class PickedEcg {

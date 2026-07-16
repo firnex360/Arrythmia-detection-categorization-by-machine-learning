@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'models.dart';
-import 'theme.dart';
-import 'widgets/gradcam_ecg.dart';
-import 'widgets/probability_bars.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/theme.dart';
+import 'package:frontend/widgets/gradcam_ecg.dart';
+import 'package:frontend/widgets/probability_bars.dart';
 
 /// Full breakdown of a single prediction.
 ///

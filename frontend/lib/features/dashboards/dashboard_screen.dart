@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'models.dart';
-import 'theme.dart';
-import 'widgets/charts.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/theme.dart';
+import 'package:frontend/widgets/charts.dart';
 
 /// Global analytics across every ECG in the system: distribution of arrhythmias,
 /// how they break down by age and gender, activity over time, and how accurate

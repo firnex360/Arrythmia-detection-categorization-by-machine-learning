@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
+import 'package:frontend/core/theme.dart';
 
 /// A slice for the donut chart.
 class PieSlice {

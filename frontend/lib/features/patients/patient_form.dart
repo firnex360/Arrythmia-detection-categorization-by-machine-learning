@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'models.dart';
-import 'theme.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Opens the add/edit patient sheet. Returns the created/updated [Patient], or
 /// null if cancelled.

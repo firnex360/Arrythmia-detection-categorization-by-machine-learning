@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Draws an ECG trace and colours it by Grad-CAM importance.
 ///

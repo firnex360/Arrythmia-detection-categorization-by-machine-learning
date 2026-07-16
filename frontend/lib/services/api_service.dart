@@ -3,9 +3,9 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import 'config.dart';
-import 'models.dart';
-import 'session.dart';
+import 'package:frontend/core/config.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/session.dart';
 
 /// Thin HTTP client for the Flask backend (`app.py`).
 class ApiService {

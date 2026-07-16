@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'models.dart';
-import 'patient_detail_screen.dart';
-import 'theme.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/features/patients/patient_detail_screen.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Dashboard de Riesgo y Alertas: patients prioritised by the model's latest
 /// finding, recent abnormal cases, and abnormal ECGs still pending the doctor's

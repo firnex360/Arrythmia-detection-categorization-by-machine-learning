@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'models.dart';
-import 'patient_detail_screen.dart';
-import 'patient_form.dart';
-import 'session.dart';
-import 'theme.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/features/patients/patient_detail_screen.dart';
+import 'package:frontend/features/patients/patient_form.dart';
+import 'package:frontend/core/session.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Home screen after login: the doctor's own patients, searchable, with entry
 /// points to add a patient and to the global dashboard.

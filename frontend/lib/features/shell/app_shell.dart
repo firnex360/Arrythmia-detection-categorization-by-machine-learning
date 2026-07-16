@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import 'analysis_screen.dart';
-import 'api_service.dart';
-import 'dashboard_screen.dart';
-import 'login_screen.dart';
-import 'patients_screen.dart';
-import 'profile_screen.dart';
-import 'risk_screen.dart';
-import 'session.dart';
-import 'theme.dart';
+import 'package:frontend/features/analysis/analysis_screen.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/features/dashboards/dashboard_screen.dart';
+import 'package:frontend/features/auth/login_screen.dart';
+import 'package:frontend/features/patients/patients_screen.dart';
+import 'package:frontend/features/profile/profile_screen.dart';
+import 'package:frontend/features/dashboards/risk_screen.dart';
+import 'package:frontend/core/session.dart';
+import 'package:frontend/core/theme.dart';
 
 class _NavItem {
   final IconData icon;

@@ -1,4 +1,4 @@
-import 'models.dart';
+import 'package:frontend/models/models.dart';
 
 /// In-memory session for the logged-in doctor.
 ///

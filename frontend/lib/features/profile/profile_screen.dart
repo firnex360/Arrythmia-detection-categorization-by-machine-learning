@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'api_service.dart';
-import 'models.dart';
-import 'session.dart';
-import 'theme.dart';
+import 'package:frontend/services/api_service.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/session.dart';
+import 'package:frontend/core/theme.dart';
 
 const _avatarColors = [
   '#38bdf8', '#10b981', '#f59e0b', '#ef4444',

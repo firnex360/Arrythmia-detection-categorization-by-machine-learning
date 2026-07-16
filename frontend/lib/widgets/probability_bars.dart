@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../models.dart';
-import '../theme.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Horizontal bars showing the probability the model assigned to every
 /// arrhythmia class — so the user sees not just the verdict but also which

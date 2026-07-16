@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'models.dart';
-import 'theme.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/theme.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  Individual clinical dashboard widgets (patient detail)

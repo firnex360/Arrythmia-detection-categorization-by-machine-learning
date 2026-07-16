@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'theme.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Parsed result of a `/predict` call to the Flask backend.
 class PredictionResult {
