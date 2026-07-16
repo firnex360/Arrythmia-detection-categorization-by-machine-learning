@@ -98,10 +98,19 @@ def init_db():
         )
 
         # ── Lightweight migrations for databases created before these columns ──
-        existing = {r["name"] for r in conn.execute("PRAGMA table_info(records)")}
+        rec_cols = {r["name"] for r in conn.execute("PRAGMA table_info(records)")}
         for col in ("verdict", "true_label"):
-            if col not in existing:
+            if col not in rec_cols:
                 conn.execute(f"ALTER TABLE records ADD COLUMN {col} TEXT")
+
+        pat_cols = {r["name"] for r in conn.execute("PRAGMA table_info(patients)")}
+        for col in ("cedula", "first_name", "last_name"):
+            if col not in pat_cols:
+                conn.execute(f"ALTER TABLE patients ADD COLUMN {col} TEXT")
+
+        doc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(doctors)")}
+        if "avatar_color" not in doc_cols:
+            conn.execute("ALTER TABLE doctors ADD COLUMN avatar_color TEXT")
 
     # Seed a demo account so the app is usable immediately.
     if get_doctor_by_username("admin") is None:
@@ -113,7 +122,9 @@ def init_db():
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _now():
-    return datetime.utcnow().isoformat(timespec="seconds")
+    # Local time so that stored dates line up with the doctor's calendar and the
+    # dashboard date-range filters (which use the client's local dates).
+    return datetime.now().isoformat(timespec="seconds")
 
 
 def file_hash(file_bytes: bytes) -> str:
@@ -207,20 +218,63 @@ def delete_session(token: str):
 
 
 def doctor_public(doc) -> dict:
-    return {"id": doc["id"], "username": doc["username"], "name": doc["name"]}
+    keys = doc.keys()
+    return {
+        "id": doc["id"],
+        "username": doc["username"],
+        "name": doc["name"],
+        "avatar_color": doc["avatar_color"] if "avatar_color" in keys else None,
+    }
+
+
+def update_doctor(doctor_id, name=None, avatar_color=None, password=None):
+    """Update the logged-in doctor's own profile. Only provided fields change."""
+    with _conn() as conn:
+        doc = conn.execute(
+            "SELECT * FROM doctors WHERE id = ?", (doctor_id,)
+        ).fetchone()
+        if doc is None:
+            return None
+        new_name = (name or "").strip() or doc["name"]
+        new_color = avatar_color if avatar_color is not None else doc["avatar_color"]
+        if password:
+            conn.execute(
+                "UPDATE doctors SET name = ?, avatar_color = ?, password_hash = ? "
+                "WHERE id = ?",
+                (new_name, new_color, generate_password_hash(password), doctor_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE doctors SET name = ?, avatar_color = ? WHERE id = ?",
+                (new_name, new_color, doctor_id),
+            )
+        doc = conn.execute(
+            "SELECT * FROM doctors WHERE id = ?", (doctor_id,)
+        ).fetchone()
+    return doctor_public(doc)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Patients
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _full_name(first, last, fallback=None):
+    full = f"{(first or '').strip()} {(last or '').strip()}".strip()
+    return full or (fallback or "").strip()
+
+
 def patient_public(row, record_count=None) -> dict:
-    age = compute_age(row["dob"])
+    keys = row.keys()
+    first = row["first_name"] if "first_name" in keys else None
+    last = row["last_name"] if "last_name" in keys else None
     out = {
         "id": row["id"],
-        "name": row["name"],
+        "cedula": row["cedula"] if "cedula" in keys else None,
+        "first_name": first,
+        "last_name": last,
+        "name": _full_name(first, last, row["name"]),
         "dob": row["dob"],
-        "age": age,
+        "age": compute_age(row["dob"]),
         "gender": row["gender"],
         "notes": row["notes"],
         "created_at": row["created_at"],
@@ -228,6 +282,24 @@ def patient_public(row, record_count=None) -> dict:
     if record_count is not None:
         out["record_count"] = record_count
     return out
+
+
+def _patient_fields(d: dict):
+    """Normalise incoming patient fields; returns (cedula, first, last, name, dob, gender, notes)."""
+    first = (d.get("first_name") or "").strip()
+    last = (d.get("last_name") or "").strip()
+    name = _full_name(first, last, d.get("name"))
+    if not name:
+        raise ValueError("El nombre del paciente es obligatorio.")
+    return (
+        (d.get("cedula") or "").strip() or None,
+        first or None,
+        last or None,
+        name,
+        d.get("dob") or None,
+        d.get("gender") or None,
+        (d.get("notes") or "").strip() or None,
+    )
 
 
 def list_patients(doctor_id: int) -> list:
@@ -246,15 +318,14 @@ def list_patients(doctor_id: int) -> list:
     return [patient_public(r, record_count=r["n"]) for r in rows]
 
 
-def create_patient(doctor_id, name, dob, gender, notes) -> dict:
-    name = (name or "").strip()
-    if not name:
-        raise ValueError("Patient name is required.")
+def create_patient(doctor_id, fields: dict) -> dict:
+    cedula, first, last, name, dob, gender, notes = _patient_fields(fields)
     with _conn() as conn:
         cur = conn.execute(
-            "INSERT INTO patients (doctor_id, name, dob, gender, notes, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (doctor_id, name, dob or None, gender or None, notes or None, _now()),
+            "INSERT INTO patients "
+            "(doctor_id, cedula, first_name, last_name, name, dob, gender, notes, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (doctor_id, cedula, first, last, name, dob, gender, notes, _now()),
         )
         row = conn.execute(
             "SELECT * FROM patients WHERE id = ?", (cur.lastrowid,)
@@ -270,17 +341,16 @@ def get_patient(patient_id, doctor_id):
         ).fetchone()
 
 
-def update_patient(patient_id, doctor_id, name, dob, gender, notes):
+def update_patient(patient_id, doctor_id, fields: dict):
     if get_patient(patient_id, doctor_id) is None:
         return None
-    name = (name or "").strip()
-    if not name:
-        raise ValueError("Patient name is required.")
+    cedula, first, last, name, dob, gender, notes = _patient_fields(fields)
     with _conn() as conn:
         conn.execute(
-            "UPDATE patients SET name = ?, dob = ?, gender = ?, notes = ? "
+            "UPDATE patients SET cedula = ?, first_name = ?, last_name = ?, "
+            "name = ?, dob = ?, gender = ?, notes = ? "
             "WHERE id = ? AND doctor_id = ?",
-            (name, dob or None, gender or None, notes or None, patient_id, doctor_id),
+            (cedula, first, last, name, dob, gender, notes, patient_id, doctor_id),
         )
         row = conn.execute(
             "SELECT * FROM patients WHERE id = ?", (patient_id,)
@@ -424,30 +494,51 @@ def set_record_verdict(record_id, doctor_id, verdict, true_label=None):
 # Dashboard — global aggregates across every record in the system
 # ──────────────────────────────────────────────────────────────────────────────
 
-def dashboard_stats() -> dict:
+def dashboard_stats(from_date=None, to_date=None, gender=None) -> dict:
     """
     Aggregate stats for the whole program: prediction counts overall, by gender
     and by age group, plus totals.  Returns raw counts keyed by class code; the
     Flask route enriches them with class colours/names.
-    """
-    with _conn() as conn:
-        totals = {
-            "doctors":  conn.execute("SELECT COUNT(*) c FROM doctors").fetchone()["c"],
-            "patients": conn.execute("SELECT COUNT(*) c FROM patients").fetchone()["c"],
-            "records":  conn.execute("SELECT COUNT(*) c FROM records").fetchone()["c"],
-        }
 
+    Optional filters (all inclusive):
+      from_date / to_date : 'YYYY-MM-DD' bounds on the ECG date.
+      gender              : 'F' | 'M' | 'Other' to restrict to one gender.
+    """
+    where = ["r.prediction IS NOT NULL"]
+    params = []
+    if from_date:
+        where.append("date(r.created_at) >= date(?)")
+        params.append(from_date)
+    if to_date:
+        where.append("date(r.created_at) <= date(?)")
+        params.append(to_date)
+    if gender:
+        where.append("p.gender = ?")
+        params.append(gender)
+    where_sql = " AND ".join(where)
+
+    with _conn() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT r.prediction AS pred, r.confidence AS conf,
                    r.verdict AS verdict, r.true_label AS true_label,
                    r.created_at AS created_at,
+                   r.patient_id AS patient_id,
                    p.gender AS gender, p.dob AS dob
             FROM records r
             JOIN patients p ON p.id = r.patient_id
-            WHERE r.prediction IS NOT NULL
-            """
+            WHERE {where_sql}
+            """,
+            params,
         ).fetchall()
+        n_doctors = conn.execute("SELECT COUNT(*) c FROM doctors").fetchone()["c"]
+
+    # Totals reflect the current filter.
+    totals = {
+        "doctors": n_doctors,
+        "patients": len({r["patient_id"] for r in rows}),
+        "records": len(rows),
+    }
 
     by_class = {}
     conf_sum = {}

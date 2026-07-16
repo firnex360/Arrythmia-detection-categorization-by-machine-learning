@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'api_service.dart';
+import 'app_shell.dart';
 import 'config.dart';
-import 'patients_screen.dart';
 import 'theme.dart';
 
 /// Doctor sign-in / sign-up. On success, replaces itself with the patients list.
@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const PatientsScreen()),
+        MaterialPageRoute(builder: (_) => const AppShell()),
       );
     } catch (e) {
       if (!mounted) return;
@@ -60,10 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Servidor backend'),
+        title: Text('Servidor backend'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             border: OutlineInputBorder(),
             hintText: 'http://127.0.0.1:5000',
           ),
@@ -71,10 +71,10 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar')),
+              child: Text('Cancelar')),
           FilledButton(
               onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('Guardar')),
+              child: Text('Guardar')),
         ],
       ),
     );
@@ -91,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
           IconButton(
             tooltip: 'Servidor',
             onPressed: _busy ? null : _editServerUrl,
-            icon: const Icon(Icons.dns_outlined),
+            icon: Icon(Icons.dns_outlined),
           ),
         ],
       ),
@@ -99,60 +99,60 @@ class _LoginScreenState extends State<LoginScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(24),
             shrinkWrap: true,
             children: [
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.border),
                 ),
-                child: const Icon(Icons.monitor_heart_rounded,
+                child: Icon(Icons.monitor_heart_rounded,
                     size: 44, color: AppColors.accent),
               ).let((w) => Center(child: w)),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               Text(
                 _registerMode ? 'Crear cuenta de doctor' : '¡Bienvenido, Doctor!',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
                     color: AppColors.text),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 _registerMode
                     ? 'Registra tus credenciales para acceder a tus pacientes.'
                     : 'Ingresa para ver el historial de tus pacientes.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                style: TextStyle(color: AppColors.muted, fontSize: 13),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               if (_registerMode) ...[
                 _field(_name, 'Nombre completo', Icons.badge_outlined),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
               ],
               _field(_username, 'Usuario', Icons.person_outline),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               _field(_password, 'Contraseña', Icons.lock_outline,
                   obscure: true, onSubmit: (_) => _submit()),
               if (_error != null) ...[
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0x22EF4444),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0x55EF4444)),
                   ),
                   child: Text(_error!,
-                      style: const TextStyle(
+                      style: TextStyle(
                           color: Color(0xFFFCA5A5), fontSize: 12.5)),
                 ),
               ],
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               FilledButton(
                 onPressed: _busy ? null : _submit,
                 style: FilledButton.styleFrom(
@@ -161,14 +161,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   foregroundColor: Colors.black,
                 ),
                 child: _busy
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.black))
                     : Text(_registerMode ? 'Registrarse' : 'Ingresar'),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               TextButton(
                 onPressed: _busy
                     ? null
@@ -181,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     : '¿Nuevo? Crear una cuenta'),
               ),
               if (!_registerMode)
-                const Text(
+                Text(
                   'Cuenta demo: admin / admin',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.muted, fontSize: 11.5),
@@ -204,11 +204,11 @@ class _LoginScreenState extends State<LoginScreen> {
       controller: c,
       obscureText: obscure,
       onSubmitted: onSubmit,
-      style: const TextStyle(color: AppColors.text),
+      style: TextStyle(color: AppColors.text),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(),
       ),
     );
   }

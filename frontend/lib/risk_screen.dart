@@ -47,7 +47,7 @@ class _RiskScreenState extends State<RiskScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Riesgo y Alertas')),
+
       body: RefreshIndicator(onRefresh: _load, child: _body()),
     );
   }
@@ -55,29 +55,29 @@ class _RiskScreenState extends State<RiskScreen> {
   Widget _body() {
     if (_error != null) {
       return ListView(children: [
-        const SizedBox(height: 80),
-        const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
-        const SizedBox(height: 12),
+        SizedBox(height: 80),
+        Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
+        SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: EdgeInsets.symmetric(horizontal: 32),
           child: Text(_error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted)),
+              style: TextStyle(color: AppColors.muted)),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Center(
           child: OutlinedButton.icon(
               onPressed: _load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar')),
+              icon: Icon(Icons.refresh),
+              label: Text('Reintentar')),
         ),
       ]);
     }
     final d = _data;
-    if (d == null) return const Center(child: CircularProgressIndicator());
+    if (d == null) return Center(child: CircularProgressIndicator());
 
     if (d.prioritized.isEmpty) {
-      return ListView(children: const [
+      return ListView(children: [
         SizedBox(height: 90),
         Icon(Icons.shield_outlined, size: 54, color: AppColors.muted),
         SizedBox(height: 14),
@@ -131,7 +131,7 @@ class _RiskScreenState extends State<RiskScreen> {
                   ],
                 ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _Panel(
           title: 'Nuevos casos anormales',
           subtitle: 'Los ECG anormales más recientes.',
@@ -168,19 +168,19 @@ class _RiskScreenState extends State<RiskScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _RiskCounts(counts: d.counts),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     if (wide)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(flex: 5, child: prioritizedPanel),
-                          const SizedBox(width: 16),
+                          SizedBox(width: 16),
                           Expanded(flex: 4, child: alertsColumn),
                         ],
                       )
                     else ...[
                       prioritizedPanel,
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       alertsColumn,
                     ],
                   ],
@@ -218,7 +218,7 @@ class _RiskCounts extends StatelessWidget {
       final c = riskColor(level);
       return Container(
         width: 150,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+        padding: EdgeInsets.symmetric(vertical: 14, horizontal: 14),
         decoration: BoxDecoration(
           color: c.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(14),
@@ -227,7 +227,7 @@ class _RiskCounts extends StatelessWidget {
         child: Row(
           children: [
             Icon(icon, color: c, size: 24),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -235,7 +235,7 @@ class _RiskCounts extends StatelessWidget {
                     style: TextStyle(
                         color: c, fontSize: 22, fontWeight: FontWeight.w800)),
                 Text('Riesgo ${riskLabel(level).toLowerCase()}',
-                    style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+                    style: TextStyle(color: AppColors.muted, fontSize: 11)),
               ],
             ),
           ],
@@ -275,7 +275,7 @@ class _RiskPatientTile extends StatelessWidget {
     final lc = riskColor(level);
     final pred = patient.latestPrediction;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: EdgeInsets.symmetric(vertical: 5),
       child: Material(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(12),
@@ -283,7 +283,7 @@ class _RiskPatientTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(12),
             child: Row(
               children: [
                 Container(
@@ -292,7 +292,7 @@ class _RiskPatientTile extends StatelessWidget {
                   decoration: BoxDecoration(
                       color: lc, borderRadius: BorderRadius.circular(3)),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,16 +302,16 @@ class _RiskPatientTile extends StatelessWidget {
                           Flexible(
                             child: Text(patient.name,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
                                     color: AppColors.text,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 14.5)),
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           _Badge(text: 'Riesgo ${riskLabel(level)}', color: lc),
                         ],
                       ),
-                      const SizedBox(height: 3),
+                      SizedBox(height: 3),
                       Text(
                         [
                           if (patient.age != null) '${patient.age} años',
@@ -322,18 +322,18 @@ class _RiskPatientTile extends StatelessWidget {
                           '${patient.abnormalCount}/${patient.totalEcgs} anormales',
                         ].join(' · '),
                         style:
-                            const TextStyle(color: AppColors.muted, fontSize: 12),
+                            TextStyle(color: AppColors.muted, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
                 if (patient.pendingReview)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(left: 8),
                     child: Icon(Icons.rule_rounded,
                         size: 18, color: Color(0xFFF59E0B)),
                   ),
-                const Icon(Icons.chevron_right, color: AppColors.muted),
+                Icon(Icons.chevron_right, color: AppColors.muted),
               ],
             ),
           ),
@@ -359,10 +359,10 @@ class _AlertTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+        contentPadding: EdgeInsets.symmetric(horizontal: 8),
         leading: Container(
           width: 10,
           height: 10,
@@ -371,18 +371,18 @@ class _AlertTile extends StatelessWidget {
         title: Text(alert.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
                 color: AppColors.text,
                 fontWeight: FontWeight.w600,
                 fontSize: 13.5)),
         subtitle: Text(
           '${alert.prediction} · ${(alert.confidence * 100).toStringAsFixed(0)}% · '
           '${_fmtDate(alert.createdAt)}',
-          style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
+          style: TextStyle(color: AppColors.muted, fontSize: 11.5),
         ),
         trailing: pending
             ? _Badge(text: 'Pendiente', color: const Color(0xFFF59E0B))
-            : const Icon(Icons.chevron_right, color: AppColors.muted),
+            : Icon(Icons.chevron_right, color: AppColors.muted),
         onTap: onTap,
       ),
     );
@@ -405,7 +405,7 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(20),
@@ -429,19 +429,19 @@ class _Panel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.text)),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(subtitle,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            const SizedBox(height: 12),
+                style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            SizedBox(height: 12),
             child,
           ],
         ),
@@ -456,15 +456,15 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_outline,
+          Icon(Icons.check_circle_outline,
               size: 18, color: AppColors.muted),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(
             child: Text(text,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
           ),
         ],
       ),

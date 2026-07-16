@@ -20,16 +20,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _error;
   String _granularity = 'day'; // 'day' | 'hour' for the timeline chart
 
+  // Filters
+  DateTimeRange? _range;
+  String? _gender; // 'F' | 'M' | 'Other' | null (all)
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  String? _iso(DateTime? d) {
+    if (d == null) return null;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${d.year}-${two(d.month)}-${two(d.day)}';
+  }
+
+  bool get _hasFilters => _range != null || _gender != null;
+
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final d = await ApiService.dashboard();
+      final d = await ApiService.dashboard(
+        from: _iso(_range?.start),
+        to: _iso(_range?.end),
+        gender: _gender,
+      );
       if (!mounted) return;
       setState(() => _data = d);
     } catch (e) {
@@ -38,13 +54,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _pickRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+      initialDateRange: _range,
+      helpText: 'Rango de fechas',
+    );
+    if (picked != null) {
+      setState(() => _range = picked);
+      _load();
+    }
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _range = null;
+      _gender = null;
+    });
+    _load();
+  }
+
+  Widget _filterBar() {
+    String rangeLabel() {
+      if (_range == null) return 'Rango de fechas';
+      String f(DateTime d) => _iso(d)!;
+      return '${f(_range!.start)} → ${f(_range!.end)}';
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _pickRange,
+          icon: const Icon(Icons.date_range, size: 18),
+          label: Text(rangeLabel()),
+        ),
+        _GenderFilter(
+          value: _gender,
+          onChanged: (g) {
+            setState(() => _gender = g);
+            _load();
+          },
+        ),
+        if (_hasFilters)
+          TextButton.icon(
+            onPressed: _clearFilters,
+            icon: const Icon(Icons.clear, size: 16),
+            label: const Text('Limpiar'),
+          ),
+      ],
+    );
+  }
+
   Color _colorFor(String code) =>
       _data?.classColors[code] ?? arrhythmiaColor(code);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard Poblacional')),
+
       body: RefreshIndicator(onRefresh: _load, child: _body()),
     );
   }
@@ -52,26 +125,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _body() {
     if (_error != null) {
       return ListView(children: [
-        const SizedBox(height: 80),
-        const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
-        const SizedBox(height: 12),
+        SizedBox(height: 80),
+        Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
+        SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: EdgeInsets.symmetric(horizontal: 32),
           child: Text(_error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted)),
+              style: TextStyle(color: AppColors.muted)),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Center(
           child: OutlinedButton.icon(
               onPressed: _load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar')),
+              icon: Icon(Icons.refresh),
+              label: Text('Reintentar')),
         ),
       ]);
     }
     final d = _data;
-    if (d == null) return const Center(child: CircularProgressIndicator());
+    if (d == null) return Center(child: CircularProgressIndicator());
 
     final present = <String>[
       ...d.classOrder.where(d.byClass.containsKey),
@@ -79,16 +152,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ];
 
     if (d.totalRecords == 0) {
-      return ListView(children: const [
-        SizedBox(height: 90),
+      return ListView(padding: const EdgeInsets.all(24), children: [
+        if (_hasFilters) ...[
+          _filterBar(),
+          const SizedBox(height: 30),
+        ],
+        const SizedBox(height: 60),
         Icon(Icons.insights_outlined, size: 54, color: AppColors.muted),
-        SizedBox(height: 14),
+        const SizedBox(height: 14),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Text(
-            'Aún no hay ECG analizados en el sistema.\n'
-            'Cuando agregues ECG a tus pacientes, aquí verás las tendencias por '
-            'edad, género, tipo de arritmia y la precisión del modelo.',
+            _hasFilters
+                ? 'No hay ECG que coincidan con el filtro seleccionado.\n'
+                    'Ajusta el rango de fechas o el género, o pulsa “Limpiar”.'
+                : 'Aún no hay ECG analizados en el sistema.\n'
+                    'Cuando agregues ECG a tus pacientes, aquí verás las tendencias por '
+                    'edad, género, tipo de arritmia y la precisión del modelo.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.muted, height: 1.5),
           ),
@@ -112,21 +192,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Resumen del programa',
+                    Text('Resumen del programa',
                         style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                             color: AppColors.text)),
-                    const SizedBox(height: 2),
-                    const Text(
+                    SizedBox(height: 2),
+                    Text(
                       'Datos agregados de todos los ECG registrados en el sistema.',
                       style: TextStyle(color: AppColors.muted, fontSize: 13),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
+                    _filterBar(),
+                    if (_hasFilters) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Mostrando datos filtrados · ${d.totalRecords} ECG',
+                        style: TextStyle(
+                            color: AppColors.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                    SizedBox(height: 16),
                     _statRow(d),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     _masonry(panels, cols),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     _Panel(
                       title: 'Leyenda de arritmias',
                       subtitle:
@@ -261,7 +353,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return Column(
         children: [
           for (final p in panels)
-            Padding(padding: const EdgeInsets.only(bottom: 16), child: p),
+            Padding(padding: EdgeInsets.only(bottom: 16), child: p),
         ],
       );
     }
@@ -278,11 +370,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 for (final p in columns[i])
                   Padding(
-                      padding: const EdgeInsets.only(bottom: 16), child: p),
+                      padding: EdgeInsets.only(bottom: 16), child: p),
               ],
             ),
           ),
-          if (i < cols - 1) const SizedBox(width: 16),
+          if (i < cols - 1) SizedBox(width: 16),
         ],
       ],
     );
@@ -341,11 +433,11 @@ class _TimelineSection extends StatelessWidget {
             onSelectionChanged: (s) => onGranularity(s.first),
             style: ButtonStyle(
               visualDensity: VisualDensity.compact,
-              textStyle: WidgetStateProperty.all(const TextStyle(fontSize: 12)),
+              textStyle: WidgetStateProperty.all(TextStyle(fontSize: 12)),
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         if (series.isEmpty)
           const _Empty('Sin actividad en esta granularidad.')
         else
@@ -381,7 +473,7 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 190,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       decoration: BoxDecoration(
         color: highlight ? const Color(0x1A38BDF8) : AppColors.surface,
         borderRadius: BorderRadius.circular(14),
@@ -391,17 +483,17 @@ class _StatTile extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, color: AppColors.accent, size: 26),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(value,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.text,
                       fontSize: 22,
                       fontWeight: FontWeight.w800)),
               Text(label,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+                  style: TextStyle(color: AppColors.muted, fontSize: 11)),
             ],
           ),
         ],
@@ -421,19 +513,19 @@ class _Panel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.text)),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(subtitle,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            const SizedBox(height: 16),
+                style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            SizedBox(height: 16),
             child,
           ],
         ),
@@ -463,7 +555,7 @@ class _AccuracyPanel extends StatelessWidget {
         title: 'Precisión del modelo',
         subtitle: 'Según lo que confirmen los doctores en cada ECG.',
         child: Row(
-          children: const [
+          children: [
             Icon(Icons.rule_rounded, color: AppColors.muted, size: 22),
             SizedBox(width: 10),
             Expanded(
@@ -492,25 +584,25 @@ class _AccuracyPanel extends StatelessWidget {
           Row(
             children: [
               Text('$pct%',
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.accent,
                       fontSize: 30,
                       fontWeight: FontWeight.w800)),
-              const SizedBox(width: 8),
-              const Padding(
+              SizedBox(width: 8),
+              Padding(
                 padding: EdgeInsets.only(top: 10),
                 child: Text('acierto global',
                     style: TextStyle(color: AppColors.muted, fontSize: 12)),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          const Text('Acierto por tipo de arritmia',
+          SizedBox(height: 10),
+          Text('Acierto por tipo de arritmia',
               style: TextStyle(
                   color: AppColors.text,
                   fontSize: 13,
                   fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           for (final code in classes)
             _AccuracyBar(
               code: code,
@@ -518,31 +610,31 @@ class _AccuracyPanel extends StatelessWidget {
               color: colorFor(code),
             ),
           if (accuracy.confusion.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text('Confusiones más comunes',
+            SizedBox(height: 12),
+            Text('Confusiones más comunes',
                 style: TextStyle(
                     color: AppColors.text,
                     fontSize: 13,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             for (final e in (accuracy.confusion.entries.toList()
                   ..sort((a, b) => b.value.compareTo(a.value))))
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
+                padding: EdgeInsets.symmetric(vertical: 2),
                 child: Row(
                   children: [
-                    const Icon(Icons.swap_horiz_rounded,
+                    Icon(Icons.swap_horiz_rounded,
                         size: 15, color: Color(0xFFEF4444)),
-                    const SizedBox(width: 6),
+                    SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         _confusionLabel(e.key),
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.text, fontSize: 12.5),
                       ),
                     ),
                     Text('${e.value}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.muted, fontSize: 12)),
                   ],
                 ),
@@ -571,7 +663,7 @@ class _AccuracyBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final frac = stat.accuracy ?? 0;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: EdgeInsets.symmetric(vertical: 5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -580,15 +672,15 @@ class _AccuracyBar extends StatelessWidget {
               Expanded(
                 child: Text(code,
                     style:
-                        const TextStyle(color: AppColors.text, fontSize: 13)),
+                        TextStyle(color: AppColors.text, fontSize: 13)),
               ),
               Text('${stat.correct}/${stat.reviewed}  ·  '
                   '${(frac * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.muted, fontSize: 12)),
             ],
           ),
-          const SizedBox(height: 5),
+          SizedBox(height: 5),
           ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: LinearProgressIndicator(
@@ -620,7 +712,7 @@ class _CountBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final frac = max <= 0 ? 0.0 : value / max;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: EdgeInsets.symmetric(vertical: 7),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -631,14 +723,14 @@ class _CountBar extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style:
-                        const TextStyle(color: AppColors.text, fontSize: 13)),
+                        TextStyle(color: AppColors.text, fontSize: 13)),
               ),
               Text('$value',
                   style: TextStyle(
                       color: color, fontWeight: FontWeight.w700, fontSize: 13)),
             ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(5),
             child: LinearProgressIndicator(
@@ -678,7 +770,7 @@ class _StackedGroups extends StatelessWidget {
       children: [
         for (final g in groups)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
+            padding: EdgeInsets.symmetric(vertical: 7),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -686,17 +778,17 @@ class _StackedGroups extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(labelMap?[g.label] ?? g.label,
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: AppColors.text,
                               fontSize: 13,
                               fontWeight: FontWeight.w600)),
                     ),
                     Text('${g.total}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.muted, fontSize: 12)),
                   ],
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(5),
                   child: SizedBox(
@@ -745,9 +837,9 @@ class _Legend extends StatelessWidget {
                     color: colorFor(code),
                     borderRadius: BorderRadius.circular(3)),
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               Text('$code · ${names[code] ?? code}',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                  style: TextStyle(color: AppColors.muted, fontSize: 12)),
             ],
           ),
       ],
@@ -761,9 +853,43 @@ class _Empty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: 8),
       child: Text(text,
-          style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+    );
+  }
+}
+
+/// Small dropdown to filter the dashboard by patient gender.
+class _GenderFilter extends StatelessWidget {
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  const _GenderFilter({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: value,
+          hint: const Text('Todos los géneros'),
+          dropdownColor: AppColors.surface2,
+          borderRadius: BorderRadius.circular(10),
+          style: TextStyle(color: AppColors.text, fontSize: 13),
+          items: const [
+            DropdownMenuItem(value: null, child: Text('Todos los géneros')),
+            DropdownMenuItem(value: 'F', child: Text('Femenino')),
+            DropdownMenuItem(value: 'M', child: Text('Masculino')),
+            DropdownMenuItem(value: 'Other', child: Text('Otro')),
+          ],
+          onChanged: onChanged,
+        ),
+      ),
     );
   }
 }

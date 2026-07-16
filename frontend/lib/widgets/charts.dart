@@ -38,13 +38,13 @@ class DonutChart extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(total.toStringAsFixed(0),
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.text,
                       fontSize: 26,
                       fontWeight: FontWeight.w800)),
               if (centerLabel.isNotEmpty)
                 Text(centerLabel,
-                    style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+                    style: TextStyle(color: AppColors.muted, fontSize: 11)),
             ],
           ),
         ),
@@ -57,7 +57,7 @@ class DonutChart extends StatelessWidget {
       children: [
         for (final s in slices)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: EdgeInsets.symmetric(vertical: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -67,15 +67,15 @@ class DonutChart extends StatelessWidget {
                   decoration: BoxDecoration(
                       color: s.color, borderRadius: BorderRadius.circular(3)),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text(s.label,
-                    style: const TextStyle(color: AppColors.text, fontSize: 13)),
-                const SizedBox(width: 6),
+                    style: TextStyle(color: AppColors.text, fontSize: 13)),
+                SizedBox(width: 6),
                 Text(
                   total <= 0
                       ? '0%'
                       : '${(s.value / total * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.muted,
                       fontSize: 12,
                       fontWeight: FontWeight.w600),
@@ -90,14 +90,14 @@ class DonutChart extends StatelessWidget {
       builder: (context, c) {
         if (c.maxWidth < 260) {
           return Column(
-            children: [donut, const SizedBox(height: 12), legend],
+            children: [donut, SizedBox(height: 12), legend],
           );
         }
         return Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             donut,
-            const SizedBox(width: 24),
+            SizedBox(width: 24),
             Flexible(child: legend),
           ],
         );
@@ -186,7 +186,7 @@ class SimpleLineChart extends StatelessWidget {
       height: height,
       child: CustomPaint(
         painter: _LinePainter(xLabels: xLabels, series: series, maxY: maxY),
-        child: const SizedBox.expand(),
+        child: SizedBox.expand(),
       ),
     );
   }
@@ -208,7 +208,7 @@ class _LinePainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = AppColors.surface2
       ..strokeWidth = 1;
-    final textStyle = const TextStyle(color: AppColors.muted, fontSize: 10);
+    final textStyle = TextStyle(color: AppColors.muted, fontSize: 10);
 
     // Horizontal grid + y labels (0 .. maxY in a few steps).
     final steps = maxY <= 4 ? maxY.toInt() : 4;

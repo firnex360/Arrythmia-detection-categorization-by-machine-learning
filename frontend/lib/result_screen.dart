@@ -122,22 +122,22 @@ class _ResultScreenState extends State<ResultScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 860),
           child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
           if (widget.alreadyExisted) ...[
             _InfoBanner(
               text: 'Este archivo ya se había analizado para este paciente; '
                   'se muestra el resultado guardado.',
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
           ],
           _VerdictCard(result: result),
           if (result.warning != null) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             _WarningBanner(text: result.warning!),
           ],
           if (widget.recordId != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _DoctorVerdictCard(
               result: result,
               verdict: _verdict,
@@ -147,7 +147,7 @@ class _ResultScreenState extends State<ResultScreen> {
             ),
           ],
           if (widget.recordId != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _NotesCard(
               controller: _notes,
               saving: _savingNotes,
@@ -156,7 +156,7 @@ class _ResultScreenState extends State<ResultScreen> {
               onChanged: () => setState(() {}),
             ),
           ],
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _SectionCard(
             title: 'Dónde miró el modelo (Grad-CAM)',
             subtitle:
@@ -168,13 +168,13 @@ class _ResultScreenState extends State<ResultScreen> {
               leadLabel: result.gradcamLead,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _SectionCard(
             title: 'Probabilidades de todas las clases',
             subtitle: 'Qué otras arritmias consideró el modelo, y con qué fuerza.',
             child: ProbabilityBars(result: result),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _SectionCard(
             title: 'Por qué este resultado',
             subtitle:
@@ -184,10 +184,10 @@ class _ResultScreenState extends State<ResultScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(result.description,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: AppColors.text, height: 1.5, fontSize: 14)),
                 if (result.keyFeatures.isNotEmpty) ...[
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   for (final f in result.keyFeatures) _FeatureRow(text: f),
                 ],
               ],
@@ -231,16 +231,16 @@ class _DoctorVerdictCard extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.fact_check_outlined,
+                Icon(Icons.fact_check_outlined,
                     size: 18, color: AppColors.accent),
-                const SizedBox(width: 8),
-                const Expanded(
+                SizedBox(width: 8),
+                Expanded(
                   child: Text('¿El modelo acertó?',
                       style: TextStyle(
                           fontSize: 15,
@@ -248,20 +248,20 @@ class _DoctorVerdictCard extends StatelessWidget {
                           color: AppColors.text)),
                 ),
                 if (saving)
-                  const SizedBox(
+                  SizedBox(
                       width: 16,
                       height: 16,
                       child:
                           CircularProgressIndicator(strokeWidth: 2)),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(
               'Confirma el diagnóstico del modelo (${result.prediction}). '
               'Tu respuesta alimenta las estadísticas de precisión del panel.',
-              style: const TextStyle(color: AppColors.muted, fontSize: 12.5),
+              style: TextStyle(color: AppColors.muted, fontSize: 12.5),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
@@ -275,7 +275,7 @@ class _DoctorVerdictCard extends StatelessWidget {
                         : () => onSet(isCorrect ? null : 'correct'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: _VerdictButton(
                     label: 'Incorrecto',
@@ -291,13 +291,13 @@ class _DoctorVerdictCard extends StatelessWidget {
               ],
             ),
             if (isIncorrect) ...[
-              const SizedBox(height: 14),
-              const Text('¿Cuál era la arritmia real?',
+              SizedBox(height: 14),
+              Text('¿Cuál era la arritmia real?',
                   style: TextStyle(
                       color: AppColors.text,
                       fontSize: 13,
                       fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -314,7 +314,7 @@ class _DoctorVerdictCard extends StatelessWidget {
                             : AppColors.text,
                         fontSize: 12.5,
                       ),
-                      side: const BorderSide(color: AppColors.border),
+                      side: BorderSide(color: AppColors.border),
                       onSelected: saving
                           ? null
                           : (_) => onSet('incorrect', trueLabel: code),
@@ -353,7 +353,7 @@ class _VerdictButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -365,7 +365,7 @@ class _VerdictButton extends StatelessWidget {
             children: [
               Icon(icon,
                   size: 19, color: selected ? color : AppColors.muted),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(label,
                   style: TextStyle(
                       color: selected ? color : AppColors.text,
@@ -398,50 +398,50 @@ class _NotesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.sticky_note_2_outlined,
+                Icon(Icons.sticky_note_2_outlined,
                     size: 18, color: AppColors.accent),
-                const SizedBox(width: 8),
-                const Text('Recomendaciones / notas del doctor',
+                SizedBox(width: 8),
+                Text('Recomendaciones / notas del doctor',
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppColors.text)),
               ],
             ),
-            const SizedBox(height: 4),
-            const Text(
+            SizedBox(height: 4),
+            Text(
               'Agrega tu interpretación clínica o recomendaciones para este ECG. '
               'Se guardan junto al resultado del modelo.',
               style: TextStyle(color: AppColors.muted, fontSize: 12.5),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             TextField(
               controller: controller,
               minLines: 3,
               maxLines: 8,
               onChanged: (_) => onChanged(),
-              style: const TextStyle(color: AppColors.text, fontSize: 14),
+              style: TextStyle(color: AppColors.text, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Escribe aquí…',
                 filled: true,
                 fillColor: AppColors.surface2,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.border),
+                  borderSide: BorderSide(color: AppColors.border),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.border),
+                  borderSide: BorderSide(color: AppColors.border),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
@@ -451,12 +451,12 @@ class _NotesCard extends StatelessWidget {
                   foregroundColor: Colors.black,
                 ),
                 icon: saving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.black))
-                    : const Icon(Icons.save_outlined, size: 18),
+                    : Icon(Icons.save_outlined, size: 18),
                 label: Text(dirty ? 'Guardar notas' : 'Guardado'),
               ),
             ),
@@ -474,7 +474,7 @@ class _InfoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0x2238BDF8),
         borderRadius: BorderRadius.circular(12),
@@ -483,11 +483,11 @@ class _InfoBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, color: AppColors.accent, size: 20),
-          const SizedBox(width: 10),
+          Icon(Icons.info_outline, color: AppColors.accent, size: 20),
+          SizedBox(width: 10),
           Expanded(
             child: Text(text,
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.text, fontSize: 12.5, height: 1.4)),
           ),
         ],
@@ -504,7 +504,7 @@ class _VerdictCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -516,7 +516,7 @@ class _VerdictCard extends StatelessWidget {
                   decoration: BoxDecoration(
                       color: result.color, shape: BoxShape.circle),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Text(
                   result.prediction,
                   style: TextStyle(
@@ -528,24 +528,24 @@ class _VerdictCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(result.fullName,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppColors.text)),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               children: [
-                const Text('Confidence',
+                Text('Confidence',
                     style: TextStyle(color: AppColors.muted)),
-                const Spacer(),
+                Spacer(),
                 Text('${(result.confidence * 100).toStringAsFixed(1)}%',
                     style: TextStyle(
                         color: result.color, fontWeight: FontWeight.w700)),
               ],
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
@@ -556,9 +556,9 @@ class _VerdictCard extends StatelessWidget {
               ),
             ),
             if (result.filename.isNotEmpty) ...[
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               Text(result.filename,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.muted,
                       fontSize: 12,
                       fontFamily: 'monospace')),
@@ -581,19 +581,19 @@ class _SectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.text)),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text(subtitle,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            const SizedBox(height: 16),
+                style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            SizedBox(height: 16),
             child,
           ],
         ),
@@ -609,18 +609,18 @@ class _FeatureRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 3, right: 10),
             child: Icon(Icons.monitor_heart_outlined,
                 size: 16, color: AppColors.accent),
           ),
           Expanded(
             child: Text(text,
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.text, height: 1.4, fontSize: 13.5)),
           ),
         ],
@@ -636,7 +636,7 @@ class _WarningBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0x22F59E0B),
         borderRadius: BorderRadius.circular(12),
@@ -645,12 +645,12 @@ class _WarningBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber_rounded,
+          Icon(Icons.warning_amber_rounded,
               color: Color(0xFFF59E0B), size: 20),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Text(text,
-                style: const TextStyle(
+                style: TextStyle(
                     color: Color(0xFFFBBF24), fontSize: 12.5, height: 1.4)),
           ),
         ],

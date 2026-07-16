@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'api_service.dart';
-import 'dashboard_screen.dart';
-import 'login_screen.dart';
-import 'risk_screen.dart';
 import 'models.dart';
 import 'patient_detail_screen.dart';
 import 'patient_form.dart';
@@ -47,56 +44,27 @@ class _PatientsScreenState extends State<PatientsScreen> {
     if (created != null) _load();
   }
 
-  Future<void> _logout() async {
-    await ApiService.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-      (_) => false,
-    );
-  }
-
   List<Patient> get _filtered {
     final all = _patients ?? const <Patient>[];
     if (_query.trim().isEmpty) return all;
     final q = _query.toLowerCase();
-    return all.where((p) => p.name.toLowerCase().contains(q)).toList();
+    return all
+        .where((p) =>
+            p.name.toLowerCase().contains(q) ||
+            (p.cedula ?? '').toLowerCase().contains(q))
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final doctorName = Session.doctor?.name ?? 'Doctor';
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis pacientes'),
-        actions: [
-          IconButton(
-            tooltip: 'Riesgo y alertas',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const RiskScreen()),
-            ),
-            icon: const Icon(Icons.warning_amber_rounded),
-          ),
-          IconButton(
-            tooltip: 'Dashboard poblacional',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const DashboardScreen()),
-            ),
-            icon: const Icon(Icons.insights_rounded),
-          ),
-          IconButton(
-            tooltip: 'Cerrar sesión',
-            onPressed: _logout,
-            icon: const Icon(Icons.logout_rounded),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPatient,
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
-        icon: const Icon(Icons.person_add_alt_1),
-        label: const Text('Nuevo paciente'),
+        icon: Icon(Icons.person_add_alt_1),
+        label: Text('Nuevo paciente'),
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -110,7 +78,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
       return _ErrorView(message: _error!, onRetry: _load);
     }
     if (_patients == null) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
 
     final items = _filtered;
@@ -158,39 +126,39 @@ class _PatientsScreenState extends State<PatientsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Hola, $doctorName',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                             color: AppColors.text)),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text('${_patients!.length} paciente(s) registrados',
-                        style: const TextStyle(
+                        style: TextStyle(
                             color: AppColors.muted, fontSize: 12.5)),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 480),
                       child: TextField(
                         onChanged: (v) => setState(() => _query = v),
-                        style: const TextStyle(color: AppColors.text),
+                        style: TextStyle(color: AppColors.text),
                         decoration: InputDecoration(
                           hintText: 'Buscar por nombre…',
-                          prefixIcon: const Icon(Icons.search, size: 20),
+                          prefixIcon: Icon(Icons.search, size: 20),
                           filled: true,
                           fillColor: AppColors.surface,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: BorderSide(color: AppColors.border),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
+                            borderSide: BorderSide(color: AppColors.border),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     tiles,
-                    const SizedBox(height: 80),
+                    SizedBox(height: 80),
                   ],
                 ),
               ),
@@ -213,17 +181,17 @@ class _PatientTile extends StatelessWidget {
         ? patient.name.trim().split(RegExp(r'\s+')).take(2).map((s) => s[0]).join()
         : '?';
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.only(bottom: 10),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         leading: CircleAvatar(
           backgroundColor: const Color(0x2638BDF8),
           child: Text(initials.toUpperCase(),
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.accent, fontWeight: FontWeight.w700)),
         ),
         title: Text(patient.name,
-            style: const TextStyle(
+            style: TextStyle(
                 color: AppColors.text, fontWeight: FontWeight.w600)),
         subtitle: Text(
           [
@@ -231,9 +199,9 @@ class _PatientTile extends StatelessWidget {
             patient.genderLabel,
             '${patient.recordCount} ECG',
           ].join(' · '),
-          style: const TextStyle(color: AppColors.muted, fontSize: 12),
+          style: TextStyle(color: AppColors.muted, fontSize: 12),
         ),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
+        trailing: Icon(Icons.chevron_right, color: AppColors.muted),
         onTap: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(
@@ -253,18 +221,18 @@ class _EmptyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 60),
+      padding: EdgeInsets.only(top: 60),
       child: Column(
         children: [
           Icon(hasPatients ? Icons.search_off : Icons.people_outline,
               size: 54, color: AppColors.muted),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Text(
             hasPatients
                 ? 'Ningún paciente coincide con la búsqueda.'
                 : 'Aún no tienes pacientes.\nAgrega el primero con el botón “Nuevo paciente”.',
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted, height: 1.5),
+            style: TextStyle(color: AppColors.muted, height: 1.5),
           ),
         ],
       ),
@@ -281,21 +249,21 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: [
-        const SizedBox(height: 80),
-        const Icon(Icons.cloud_off_rounded, size: 54, color: AppColors.muted),
-        const SizedBox(height: 12),
+        SizedBox(height: 80),
+        Icon(Icons.cloud_off_rounded, size: 54, color: AppColors.muted),
+        SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: EdgeInsets.symmetric(horizontal: 32),
           child: Text(message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, height: 1.5)),
+              style: TextStyle(color: AppColors.muted, height: 1.5)),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Center(
           child: OutlinedButton.icon(
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reintentar'),
+            icon: Icon(Icons.refresh),
+            label: Text('Reintentar'),
           ),
         ),
       ],

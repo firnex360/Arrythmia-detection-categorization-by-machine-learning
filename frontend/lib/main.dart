@@ -12,11 +12,17 @@ class EcgApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ECG Arrhythmia Detector',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: const LoginScreen(),
+    // Rebuild the whole app when the light/dark mode toggles.
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'ECG IA',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          home: const LoginScreen(),
+        );
+      },
     );
   }
 }

@@ -90,8 +90,27 @@ class ApiService {
         .toList();
   }
 
+  static Map<String, dynamic> _patientBody({
+    String? cedula,
+    String? firstName,
+    String? lastName,
+    String? dob,
+    String? gender,
+    String? notes,
+  }) =>
+      {
+        'cedula': cedula,
+        'first_name': firstName,
+        'last_name': lastName,
+        'dob': dob,
+        'gender': gender,
+        'notes': notes,
+      };
+
   static Future<Patient> createPatient({
-    required String name,
+    String? cedula,
+    String? firstName,
+    String? lastName,
     String? dob,
     String? gender,
     String? notes,
@@ -99,15 +118,22 @@ class ApiService {
     final resp = await http
         .post(_u('/patients'),
             headers: _jsonHeaders,
-            body: jsonEncode(
-                {'name': name, 'dob': dob, 'gender': gender, 'notes': notes}))
+            body: jsonEncode(_patientBody(
+                cedula: cedula,
+                firstName: firstName,
+                lastName: lastName,
+                dob: dob,
+                gender: gender,
+                notes: notes)))
         .timeout(const Duration(seconds: 15));
     return Patient.fromJson(_decode(resp)['patient'] as Map<String, dynamic>);
   }
 
   static Future<Patient> updatePatient(
     int id, {
-    required String name,
+    String? cedula,
+    String? firstName,
+    String? lastName,
     String? dob,
     String? gender,
     String? notes,
@@ -115,8 +141,13 @@ class ApiService {
     final resp = await http
         .put(_u('/patients/$id'),
             headers: _jsonHeaders,
-            body: jsonEncode(
-                {'name': name, 'dob': dob, 'gender': gender, 'notes': notes}))
+            body: jsonEncode(_patientBody(
+                cedula: cedula,
+                firstName: firstName,
+                lastName: lastName,
+                dob: dob,
+                gender: gender,
+                notes: notes)))
         .timeout(const Duration(seconds: 15));
     return Patient.fromJson(_decode(resp)['patient'] as Map<String, dynamic>);
   }
@@ -195,10 +226,19 @@ class ApiService {
   }
 
   // ── Dashboard ───────────────────────────────────────────────────────────
-  static Future<DashboardData> dashboard() async {
-    final resp = await http
-        .get(_u('/dashboard'), headers: _authHeader)
-        .timeout(const Duration(seconds: 15));
+  static Future<DashboardData> dashboard({
+    String? from,
+    String? to,
+    String? gender,
+  }) async {
+    final q = <String, String>{};
+    if (from != null && from.isNotEmpty) q['from'] = from;
+    if (to != null && to.isNotEmpty) q['to'] = to;
+    if (gender != null && gender.isNotEmpty) q['gender'] = gender;
+    final uri = Uri.parse('${AppConfig.baseUrl}/dashboard')
+        .replace(queryParameters: q.isEmpty ? null : q);
+    final resp =
+        await http.get(uri, headers: _authHeader).timeout(const Duration(seconds: 15));
     return DashboardData.fromJson(_decode(resp));
   }
 
@@ -207,6 +247,27 @@ class ApiService {
         .get(_u('/risk'), headers: _authHeader)
         .timeout(const Duration(seconds: 15));
     return RiskOverview.fromJson(_decode(resp));
+  }
+
+  // ── Profile ─────────────────────────────────────────────────────────────
+  static Future<Doctor> updateProfile({
+    String? name,
+    String? avatarColor,
+    String? password,
+  }) async {
+    final resp = await http
+        .put(_u('/me'),
+            headers: _jsonHeaders,
+            body: jsonEncode({
+              if (name != null) 'name': name,
+              if (avatarColor != null) 'avatar_color': avatarColor,
+              if (password != null && password.isNotEmpty) 'password': password,
+            }))
+        .timeout(const Duration(seconds: 15));
+    final doctor =
+        Doctor.fromJson(_decode(resp)['doctor'] as Map<String, dynamic>);
+    Session.doctor = doctor; // keep the session's copy fresh
+    return doctor;
   }
 }
 

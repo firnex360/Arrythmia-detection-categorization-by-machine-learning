@@ -26,14 +26,9 @@ class AppConfig {
     return 'http://127.0.0.1:5000';
   }
 
-  /// File extensions the backend can handle as raw signal data.
+  /// File extensions the doctor can upload — raw ECG signal data only.
+  /// (Image/photo input was removed from the app.)
   static const List<String> signalExtensions = ['pt', 'mat', 'dat'];
 
-  /// Image / PDF extensions — digitised into 12 leads by ECGtizer on the backend.
-  static const List<String> imageExtensions = [
-    'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'pdf',
-  ];
-
-  static List<String> get allExtensions =>
-      [...signalExtensions, ...imageExtensions];
+  static List<String> get allExtensions => signalExtensions;
 }

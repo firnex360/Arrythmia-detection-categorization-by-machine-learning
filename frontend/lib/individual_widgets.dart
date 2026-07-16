@@ -27,30 +27,30 @@ class CurrentDiagnosisCard extends StatelessWidget {
     final color = arrhythmiaColor(record.prediction);
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.medical_information_outlined,
+                Icon(Icons.medical_information_outlined,
                     size: 18, color: AppColors.accent),
-                const SizedBox(width: 8),
-                const Text('Diagnóstico actual',
+                SizedBox(width: 8),
+                Text('Diagnóstico actual',
                     style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AppColors.text)),
-                const Spacer(),
+                Spacer(),
                 Flexible(
                   child: Text(_fmtDateTime(record.createdAt),
                       overflow: TextOverflow.ellipsis,
                       style:
-                          const TextStyle(color: AppColors.muted, fontSize: 11)),
+                          TextStyle(color: AppColors.muted, fontSize: 11)),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Row(
               children: [
                 Container(
@@ -59,13 +59,13 @@ class CurrentDiagnosisCard extends StatelessWidget {
                   decoration:
                       BoxDecoration(color: color, shape: BoxShape.circle),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Text(record.prediction,
                     style: TextStyle(
                         color: color,
                         fontSize: 26,
                         fontWeight: FontWeight.w800)),
-                const Spacer(),
+                Spacer(),
                 Text('${(record.confidence * 100).toStringAsFixed(1)}%',
                     style: TextStyle(
                         color: color,
@@ -73,7 +73,7 @@ class CurrentDiagnosisCard extends StatelessWidget {
                         fontWeight: FontWeight.w700)),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(5),
               child: LinearProgressIndicator(
@@ -85,18 +85,18 @@ class CurrentDiagnosisCard extends StatelessWidget {
             ),
             if (record.doctorNotes != null &&
                 record.doctorNotes!.trim().isNotEmpty) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(record.doctorNotes!,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.text, fontSize: 12.5, height: 1.4)),
             ],
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Align(
               alignment: Alignment.centerLeft,
               child: FilledButton.tonalIcon(
                 onPressed: onExplain,
-                icon: const Icon(Icons.insights_rounded, size: 18),
-                label: const Text('Ver explicación (Grad-CAM)'),
+                icon: Icon(Icons.insights_rounded, size: 18),
+                label: Text('Ver explicación (Grad-CAM)'),
               ),
             ),
           ],
@@ -116,21 +116,21 @@ class EvolutionCard extends StatelessWidget {
     final ordered = records.reversed.toList(); // oldest -> newest
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Evolución de los ECG',
+            Text('Evolución de los ECG',
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.text)),
-            const SizedBox(height: 4),
-            const Text(
+            SizedBox(height: 4),
+            Text(
                 'Secuencia de estudios del más antiguo al más reciente. La altura '
                 'de cada barra indica la confianza del modelo.',
                 style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             SizedBox(
               height: 130,
               child: SingleChildScrollView(
@@ -140,7 +140,7 @@ class EvolutionCard extends StatelessWidget {
                   children: [
                     for (var i = 0; i < ordered.length; i++) ...[
                       if (i > 0)
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.only(bottom: 44),
                           child: Icon(Icons.arrow_right_alt,
                               size: 18, color: AppColors.muted),
@@ -172,8 +172,8 @@ class _EvolutionMarker extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           Text('${(record.confidence * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(color: AppColors.muted, fontSize: 10)),
-          const SizedBox(height: 4),
+              style: TextStyle(color: AppColors.muted, fontSize: 10)),
+          SizedBox(height: 4),
           Container(
             width: 22,
             height: barH,
@@ -182,12 +182,12 @@ class _EvolutionMarker extends StatelessWidget {
               borderRadius: BorderRadius.circular(5),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(record.prediction,
               style: TextStyle(
                   color: color, fontWeight: FontWeight.w700, fontSize: 12)),
           Text(_shortDate(record.createdAt),
-              style: const TextStyle(color: AppColors.muted, fontSize: 10)),
+              style: TextStyle(color: AppColors.muted, fontSize: 10)),
         ],
       ),
     );
@@ -234,44 +234,44 @@ class _ComparisonCardState extends State<ComparisonCard> {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Comparación entre estudios',
+            Text('Comparación entre estudios',
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.text)),
-            const SizedBox(height: 4),
-            const Text(
+            SizedBox(height: 4),
+            Text(
                 'Elige dos ECG para contrastar el diagnóstico y las probabilidades.',
                 style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
                     child: _selector(
                         'Estudio A', _aId, (v) => setState(() => _aId = v))),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                     child: _selector(
                         'Estudio B', _bId, (v) => setState(() => _bId = v))),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(child: _StudyColumn(record: a)),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(child: _StudyColumn(record: b)),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color:
                     changed ? const Color(0x22F59E0B) : const Color(0x2210B981),
@@ -288,14 +288,14 @@ class _ComparisonCardState extends State<ComparisonCard> {
                       color: changed
                           ? const Color(0xFFF59E0B)
                           : const Color(0xFF10B981)),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       changed
                           ? 'El diagnóstico cambió: ${a.prediction} → ${b.prediction}.'
                           : 'Mismo diagnóstico en ambos estudios (${a.prediction}).',
                       style:
-                          const TextStyle(color: AppColors.text, fontSize: 12.5),
+                          TextStyle(color: AppColors.text, fontSize: 12.5),
                     ),
                   ),
                 ],
@@ -312,11 +312,11 @@ class _ComparisonCardState extends State<ComparisonCard> {
       initialValue: value,
       isExpanded: true,
       dropdownColor: AppColors.surface2,
-      style: const TextStyle(color: AppColors.text, fontSize: 12.5),
+      style: TextStyle(color: AppColors.text, fontSize: 12.5),
       decoration: InputDecoration(
         labelText: label,
         isDense: true,
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(),
       ),
       items: [
         for (final r in widget.records)
@@ -342,7 +342,7 @@ class _StudyColumn extends StatelessWidget {
     final probs = record.classProbs.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(10),
@@ -355,8 +355,8 @@ class _StudyColumn extends StatelessWidget {
               style: TextStyle(
                   color: color, fontWeight: FontWeight.w800, fontSize: 18)),
           Text('${(record.confidence * 100).toStringAsFixed(1)}% confianza',
-              style: const TextStyle(color: AppColors.muted, fontSize: 11)),
-          const SizedBox(height: 10),
+              style: TextStyle(color: AppColors.muted, fontSize: 11)),
+          SizedBox(height: 10),
           for (final e in probs) _miniBar(e.key, e.value),
         ],
       ),
@@ -366,7 +366,7 @@ class _StudyColumn extends StatelessWidget {
   Widget _miniBar(String code, double p) {
     final color = arrhythmiaColor(code);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: EdgeInsets.symmetric(vertical: 3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -375,13 +375,13 @@ class _StudyColumn extends StatelessWidget {
               Expanded(
                 child: Text(code,
                     style:
-                        const TextStyle(color: AppColors.text, fontSize: 11.5)),
+                        TextStyle(color: AppColors.text, fontSize: 11.5)),
               ),
               Text('${(p * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+                  style: TextStyle(color: AppColors.muted, fontSize: 11)),
             ],
           ),
-          const SizedBox(height: 3),
+          SizedBox(height: 3),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(

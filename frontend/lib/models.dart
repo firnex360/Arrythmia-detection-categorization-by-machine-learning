@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'theme.dart';
+
 /// Parsed result of a `/predict` call to the Flask backend.
 class PredictionResult {
   final String prediction; // short code, e.g. "AFIB"
@@ -113,19 +115,39 @@ class Doctor {
   final int id;
   final String username;
   final String name;
-  Doctor({required this.id, required this.username, required this.name});
+  final String? avatarColor; // hex like '#38bdf8'
+  Doctor({
+    required this.id,
+    required this.username,
+    required this.name,
+    this.avatarColor,
+  });
 
   factory Doctor.fromJson(Map<String, dynamic> j) => Doctor(
         id: (j['id'] as num).toInt(),
         username: '${j['username'] ?? ''}',
         name: '${j['name'] ?? j['username'] ?? ''}',
+        avatarColor: j['avatar_color'] as String?,
       );
+
+  /// Up to two initials for the avatar circle.
+  String get initials {
+    final parts = name.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty);
+    if (parts.isEmpty) return '?';
+    return parts.take(2).map((s) => s[0].toUpperCase()).join();
+  }
+
+  Color get color =>
+      PredictionResult.parseColor(avatarColor, AppColors.accent);
 }
 
 /// A patient owned by the current doctor.
 class Patient {
   final int id;
-  final String name;
+  final String? cedula;
+  final String? firstName;
+  final String? lastName;
+  final String name; // full name (computed by backend)
   final String? dob; // ISO YYYY-MM-DD
   final int? age; // computed by the backend from dob
   final String? gender; // 'F' | 'M' | 'Other'
@@ -134,6 +156,9 @@ class Patient {
 
   Patient({
     required this.id,
+    this.cedula,
+    this.firstName,
+    this.lastName,
     required this.name,
     this.dob,
     this.age,
@@ -144,6 +169,9 @@ class Patient {
 
   factory Patient.fromJson(Map<String, dynamic> j) => Patient(
         id: (j['id'] as num).toInt(),
+        cedula: j['cedula'] as String?,
+        firstName: j['first_name'] as String?,
+        lastName: j['last_name'] as String?,
         name: '${j['name'] ?? ''}',
         dob: j['dob'] as String?,
         age: (j['age'] as num?)?.toInt(),
@@ -158,6 +186,12 @@ class Patient {
         'Other' => 'Otro',
         _ => '—',
       };
+
+  String get initials {
+    final parts = name.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty);
+    if (parts.isEmpty) return '?';
+    return parts.take(2).map((s) => s[0].toUpperCase()).join();
+  }
 }
 
 /// One ECG analysis stored against a patient.

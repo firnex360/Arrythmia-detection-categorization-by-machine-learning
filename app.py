@@ -673,6 +673,22 @@ def me():
     return jsonify({"doctor": db.doctor_public(g.doctor)})
 
 
+@app.route("/me", methods=["PUT"])
+@require_auth
+def update_me():
+    """Doctor updates their own profile (name, avatar colour, optional password)."""
+    d = request.get_json(silent=True) or {}
+    doc = db.update_doctor(
+        g.doctor["id"],
+        name=d.get("name"),
+        avatar_color=d.get("avatar_color"),
+        password=d.get("password") or None,
+    )
+    if doc is None:
+        return jsonify({"error": "Doctor not found."}), 404
+    return jsonify({"doctor": doc})
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Patients
 # ──────────────────────────────────────────────────────────────────────────────
@@ -688,9 +704,7 @@ def patients_list():
 def patients_create():
     d = request.get_json(silent=True) or {}
     try:
-        patient = db.create_patient(
-            g.doctor["id"], d.get("name"), d.get("dob"), d.get("gender"), d.get("notes"),
-        )
+        patient = db.create_patient(g.doctor["id"], d)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify({"patient": patient})
@@ -713,10 +727,7 @@ def patient_detail(patient_id):
 def patient_update(patient_id):
     d = request.get_json(silent=True) or {}
     try:
-        patient = db.update_patient(
-            patient_id, g.doctor["id"],
-            d.get("name"), d.get("dob"), d.get("gender"), d.get("notes"),
-        )
+        patient = db.update_patient(patient_id, g.doctor["id"], d)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     if patient is None:
@@ -830,7 +841,11 @@ def _class_meta():
 @app.route("/dashboard", methods=["GET"])
 @require_auth
 def dashboard():
-    stats = db.dashboard_stats()
+    stats = db.dashboard_stats(
+        from_date=request.args.get("from") or None,
+        to_date=request.args.get("to") or None,
+        gender=request.args.get("gender") or None,
+    )
     stats.update(_class_meta())
     return jsonify(stats)
 

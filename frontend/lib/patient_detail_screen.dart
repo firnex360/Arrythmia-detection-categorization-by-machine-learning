@@ -56,18 +56,18 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Eliminar paciente'),
+        title: Text('Eliminar paciente'),
         content: Text(
             '¿Eliminar a ${_patient?.name ?? 'este paciente'} y todos sus ECG? '
             'Esta acción no se puede deshacer.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancelar')),
+              child: Text('Cancelar')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar'),
+            child: Text('Eliminar'),
           ),
         ],
       ),
@@ -85,7 +85,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 
   Future<void> _addEcg() async {
-    final picked = await pickEcgSource(context);
+    final picked = await pickEcgFile();
     if (picked == null || !mounted) return;
 
     setState(() => _analyzing = true);
@@ -111,12 +111,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         context: context,
         builder: (_) => AlertDialog(
           backgroundColor: AppColors.surface,
-          title: const Text('No se pudo analizar'),
+          title: Text('No se pudo analizar'),
           content: Text('$e'),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('OK')),
+                child: Text('OK')),
           ],
         ),
       );
@@ -164,11 +164,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             IconButton(
                 tooltip: 'Editar',
                 onPressed: _editPatient,
-                icon: const Icon(Icons.edit_outlined)),
+                icon: Icon(Icons.edit_outlined)),
             IconButton(
                 tooltip: 'Eliminar',
                 onPressed: _deletePatient,
-                icon: const Icon(Icons.delete_outline)),
+                icon: Icon(Icons.delete_outline)),
           ],
         ],
       ),
@@ -179,12 +179,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               backgroundColor: AppColors.accent,
               foregroundColor: Colors.black,
               icon: _analyzing
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.black))
-                  : const Icon(Icons.add_chart_rounded),
+                  : Icon(Icons.add_chart_rounded),
               label: Text(_analyzing ? 'Analizando…' : 'Agregar ECG'),
             ),
       body: RefreshIndicator(onRefresh: _load, child: _body()),
@@ -194,26 +194,26 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   Widget _body() {
     if (_error != null) {
       return ListView(children: [
-        const SizedBox(height: 80),
-        const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
-        const SizedBox(height: 12),
+        SizedBox(height: 80),
+        Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.muted),
+        SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
+          padding: EdgeInsets.symmetric(horizontal: 32),
           child: Text(_error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted)),
+              style: TextStyle(color: AppColors.muted)),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Center(
           child: OutlinedButton.icon(
               onPressed: _load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar')),
+              icon: Icon(Icons.refresh),
+              label: Text('Reintentar')),
         ),
       ]);
     }
     if (_patient == null) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
 
     return LayoutBuilder(
@@ -229,7 +229,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 children: [
                   Expanded(flex: 5, child: info),
                   if (_records.isNotEmpty) ...[
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(flex: 4, child: summary),
                   ],
                 ],
@@ -238,7 +238,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 children: [
                   info,
                   if (_records.isNotEmpty) ...[
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     summary,
                   ],
                 ],
@@ -256,27 +256,27 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   children: [
                     header,
                     if (_records.isNotEmpty) ...[
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       CurrentDiagnosisCard(
                         record: _records.first,
                         onExplain: () => _openRecord(_records.first),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       EvolutionCard(records: _records),
                       if (_records.length >= 2) ...[
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         ComparisonCard(records: _records),
                       ],
                     ],
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     Text('Historial de ECG (${_records.length})',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: AppColors.text)),
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     if (_records.isEmpty)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.symmetric(vertical: 28),
                         child: Center(
                           child: Text('Sin ECG registrados.\nUsa “Agregar ECG”.',
@@ -288,7 +288,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                     else
                       for (final r in _records)
                         _RecordTile(record: r, onTap: () => _openRecord(r)),
-                    const SizedBox(height: 80),
+                    SizedBox(height: 80),
                   ],
                 ),
               ),
@@ -308,20 +308,22 @@ class _InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(patient.name,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: AppColors.text)),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
+                if (patient.cedula != null && patient.cedula!.isNotEmpty)
+                  _Chip(icon: Icons.badge_outlined, label: 'CC ${patient.cedula}'),
                 _Chip(
                     icon: Icons.cake_outlined,
                     label: patient.age != null
@@ -333,15 +335,15 @@ class _InfoCard extends StatelessWidget {
               ],
             ),
             if (patient.notes != null && patient.notes!.trim().isNotEmpty) ...[
-              const SizedBox(height: 14),
-              const Text('Datos adicionales',
+              SizedBox(height: 14),
+              Text('Datos adicionales',
                   style: TextStyle(
                       color: AppColors.muted,
                       fontSize: 12,
                       fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(patient.notes!,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color: AppColors.text, height: 1.5, fontSize: 13.5)),
             ],
           ],
@@ -359,7 +361,7 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(20),
@@ -369,9 +371,9 @@ class _Chip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 15, color: AppColors.muted),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(label,
-              style: const TextStyle(color: AppColors.text, fontSize: 12.5)),
+              style: TextStyle(color: AppColors.text, fontSize: 12.5)),
         ],
       ),
     );
@@ -386,7 +388,7 @@ class _HistorySummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (records.isEmpty) return const SizedBox.shrink();
+    if (records.isEmpty) return SizedBox.shrink();
 
     final counts = <String, int>{};
     for (final r in records) {
@@ -400,20 +402,20 @@ class _HistorySummary extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Resumen de ECG',
+            Text('Resumen de ECG',
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.text)),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             Text('Último resultado: ${latest.prediction} · '
                 '${(latest.confidence * 100).toStringAsFixed(0)}% de confianza',
-                style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            const SizedBox(height: 14),
+                style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+            SizedBox(height: 14),
             // Stacked distribution bar.
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
@@ -430,7 +432,7 @@ class _HistorySummary extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Wrap(
               spacing: 14,
               runSpacing: 6,
@@ -447,9 +449,9 @@ class _HistorySummary extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 6),
                       Text('${e.key}  ${e.value}/$total',
-                          style: const TextStyle(
+                          style: TextStyle(
                               color: AppColors.text, fontSize: 12)),
                     ],
                   ),
@@ -478,9 +480,9 @@ class _RecordTile extends StatelessWidget {
       _ => null,
     };
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.only(bottom: 10),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         leading: Container(
           width: 12,
           height: 12,
@@ -489,20 +491,20 @@ class _RecordTile extends StatelessWidget {
         title: Row(
           children: [
             Text(record.prediction,
-                style: const TextStyle(
+                style: TextStyle(
                     color: AppColors.text,
                     fontWeight: FontWeight.w700,
                     fontSize: 15)),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Text('${(record.confidence * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                style: TextStyle(color: AppColors.muted, fontSize: 12)),
             if (hasNote) ...[
-              const SizedBox(width: 8),
-              const Icon(Icons.sticky_note_2_outlined,
+              SizedBox(width: 8),
+              Icon(Icons.sticky_note_2_outlined,
                   size: 15, color: AppColors.accent),
             ],
             if (verdictIcon != null) ...[
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Icon(verdictIcon.$1, size: 15, color: verdictIcon.$2),
             ],
           ],
@@ -511,9 +513,9 @@ class _RecordTile extends StatelessWidget {
           '${_fmtDate(record.createdAt)}${record.filename.isNotEmpty ? ' · ${record.filename}' : ''}',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColors.muted, fontSize: 12),
+          style: TextStyle(color: AppColors.muted, fontSize: 12),
         ),
-        trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
+        trailing: Icon(Icons.chevron_right, color: AppColors.muted),
         onTap: onTap,
       ),
     );
