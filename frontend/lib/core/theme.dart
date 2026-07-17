@@ -50,6 +50,29 @@ class ThemeController extends ChangeNotifier {
   }
 }
 
+/// Mixin for screen States so they rebuild when the light/dark mode toggles.
+///
+/// Needed because our colours are global getters (`AppColors.x`) rather than
+/// `Theme.of(context)` reads, so widgets don't otherwise depend on the theme and
+/// wouldn't repaint their text/borders on a toggle.
+mixin ThemeReactive<T extends StatefulWidget> on State<T> {
+  @override
+  void initState() {
+    super.initState();
+    ThemeController.instance.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    ThemeController.instance.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
+  }
+}
+
 /// Per-class accent colours, matching the backend's `_COLORS` in app.py.
 const Map<String, Color> kArrhythmiaColors = {
   'SR': Color(0xFF10B981),

@@ -15,7 +15,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with ThemeReactive<DashboardScreen> {
   DashboardData? _data;
   String? _error;
   String _granularity = 'day'; // 'day' | 'hour' for the timeline chart

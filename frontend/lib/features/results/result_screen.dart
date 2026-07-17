@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:frontend/services/api_service.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/core/theme.dart';
+import 'package:frontend/features/analysis/ecg_picker.dart';
+import 'package:frontend/features/patients/patient_picker.dart';
 import 'package:frontend/widgets/gradcam_ecg.dart';
 import 'package:frontend/widgets/probability_bars.dart';
 
 /// Full breakdown of a single prediction.
 ///
-/// When [recordId] is provided (i.e. the result is a stored patient ECG), the
-/// doctor can also add recommendations / notes, which are saved to the backend.
+/// When [recordId] is set (a stored patient ECG) the doctor can add a verdict and
+/// notes. When [source] is provided instead (an un-saved preview), the doctor can
+/// assign the ECG to a patient from here — which stores it and unlocks the rest.
 class ResultScreen extends StatefulWidget {
   final PredictionResult result;
   final int? recordId;
@@ -18,6 +21,9 @@ class ResultScreen extends StatefulWidget {
   final String? initialTrueLabel;
   final bool alreadyExisted;
   final String? patientName;
+
+  /// The raw file behind an un-saved preview, so it can be assigned to a patient.
+  final PickedEcg? source;
 
   const ResultScreen({
     super.key,
@@ -28,13 +34,14 @@ class ResultScreen extends StatefulWidget {
     this.initialTrueLabel,
     this.alreadyExisted = false,
     this.patientName,
+    this.source,
   });
 
   @override
   State<ResultScreen> createState() => _ResultScreenState();
 }
 
-class _ResultScreenState extends State<ResultScreen> {
+class _ResultScreenState extends State<ResultScreen> with ThemeReactive<ResultScreen> {
   late final TextEditingController _notes;
   bool _savingNotes = false;
   String? _savedNotes; // last value confirmed saved
@@ -43,7 +50,13 @@ class _ResultScreenState extends State<ResultScreen> {
   String? _trueLabel; // actual class when incorrect
   bool _savingVerdict = false;
 
+  // Assignment state (mutable — set once the preview is stored to a patient).
+  int? _recordId;
+  String? _patientName;
+  bool _assigning = false;
+
   PredictionResult get result => widget.result;
+  bool get _isSaved => _recordId != null;
 
   @override
   void initState() {
@@ -52,14 +65,47 @@ class _ResultScreenState extends State<ResultScreen> {
     _savedNotes = widget.initialNotes ?? '';
     _verdict = widget.initialVerdict;
     _trueLabel = widget.initialTrueLabel;
+    _recordId = widget.recordId;
+    _patientName = widget.patientName;
+  }
+
+  Future<void> _assignToPatient() async {
+    if (widget.source == null || _assigning) return;
+    final patient = await showPatientPicker(context);
+    if (patient == null || !mounted) return;
+    setState(() => _assigning = true);
+    try {
+      final (record, _) = await ApiService.analyzeForPatient(
+        patientId: patient.id,
+        bytes: widget.source!.bytes,
+        filename: widget.source!.name,
+      );
+      if (!mounted) return;
+      setState(() {
+        _assigning = false;
+        _recordId = record.id;
+        _patientName = patient.name;
+        _verdict = record.verdict;
+        _trueLabel = record.trueLabel;
+        _notes.text = record.doctorNotes ?? '';
+        _savedNotes = record.doctorNotes ?? '';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ECG guardado en ${patient.name}.')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _assigning = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   Future<void> _setVerdict(String? verdict, {String? trueLabel}) async {
-    if (widget.recordId == null) return;
+    if (_recordId == null) return;
     setState(() => _savingVerdict = true);
     try {
       final updated = await ApiService.setRecordVerdict(
-        widget.recordId!,
+        _recordId!,
         verdict: verdict,
         trueLabel: trueLabel,
       );
@@ -86,11 +132,11 @@ class _ResultScreenState extends State<ResultScreen> {
   bool get _notesDirty => _notes.text.trim() != (_savedNotes ?? '').trim();
 
   Future<void> _saveNotes() async {
-    if (widget.recordId == null) return;
+    if (_recordId == null) return;
     setState(() => _savingNotes = true);
     try {
       final updated =
-          await ApiService.updateRecordNotes(widget.recordId!, _notes.text.trim());
+          await ApiService.updateRecordNotes(_recordId!, _notes.text.trim());
       if (!mounted) return;
       setState(() {
         _savedNotes = updated.doctorNotes ?? '';
@@ -114,8 +160,8 @@ class _ResultScreenState extends State<ResultScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.patientName != null
-            ? 'ECG · ${widget.patientName}'
+        title: Text(_patientName != null
+            ? 'ECG · $_patientName'
             : 'Resultado del análisis'),
       ),
       body: Center(
@@ -136,7 +182,15 @@ class _ResultScreenState extends State<ResultScreen> {
             SizedBox(height: 12),
             _WarningBanner(text: result.warning!),
           ],
-          if (widget.recordId != null) ...[
+          // Un-saved preview: offer to assign to a patient.
+          if (!_isSaved && widget.source != null) ...[
+            SizedBox(height: 16),
+            _AssignCard(
+              assigning: _assigning,
+              onAssign: _assignToPatient,
+            ),
+          ],
+          if (_isSaved) ...[
             SizedBox(height: 16),
             _DoctorVerdictCard(
               result: result,
@@ -146,7 +200,7 @@ class _ResultScreenState extends State<ResultScreen> {
               onSet: _setVerdict,
             ),
           ],
-          if (widget.recordId != null) ...[
+          if (_isSaved) ...[
             SizedBox(height: 16),
             _NotesCard(
               controller: _notes,
@@ -374,6 +428,63 @@ class _VerdictButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shown for an un-saved preview: prompts the doctor to assign the ECG to a
+/// patient (which stores it and unlocks verdict + notes).
+class _AssignCard extends StatelessWidget {
+  final bool assigning;
+  final VoidCallback onAssign;
+  const _AssignCard({required this.assigning, required this.onAssign});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.person_search_outlined, color: AppColors.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Este análisis aún no está guardado',
+                    style: TextStyle(
+                        color: AppColors.text,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14)),
+                const SizedBox(height: 2),
+                Text(
+                    'Asígnalo a un paciente para guardarlo en su historial y '
+                    'poder añadir veredicto y notas.',
+                    style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton.icon(
+            onPressed: assigning ? null : onAssign,
+            style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent, foregroundColor: Colors.black),
+            icon: assigning
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.black))
+                : const Icon(Icons.save_outlined, size: 18),
+            label: Text(assigning ? 'Guardando…' : 'Asignar a paciente'),
+          ),
+        ],
       ),
     );
   }

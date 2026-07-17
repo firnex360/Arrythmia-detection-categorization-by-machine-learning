@@ -15,7 +15,7 @@ class RiskScreen extends StatefulWidget {
   State<RiskScreen> createState() => _RiskScreenState();
 }
 
-class _RiskScreenState extends State<RiskScreen> {
+class _RiskScreenState extends State<RiskScreen> with ThemeReactive<RiskScreen> {
   RiskOverview? _data;
   String? _error;
 

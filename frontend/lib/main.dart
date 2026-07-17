@@ -17,7 +17,7 @@ class EcgApp extends StatelessWidget {
       listenable: ThemeController.instance,
       builder: (context, _) {
         return MaterialApp(
-          title: 'ECG IA',
+          title: 'SIEMIA',
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
           home: const LoginScreen(),

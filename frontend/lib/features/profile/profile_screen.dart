@@ -19,7 +19,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with ThemeReactive<ProfileScreen> {
   late final TextEditingController _name;
   late final TextEditingController _password;
   String? _avatarColor;

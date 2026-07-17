@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:frontend/services/api_service.dart';
 import 'package:frontend/features/analysis/ecg_picker.dart';
-import 'package:frontend/features/patients/individual_widgets.dart';
 import 'package:frontend/models/models.dart';
 import 'package:frontend/features/patients/patient_form.dart';
 import 'package:frontend/features/results/result_screen.dart';
@@ -18,7 +17,7 @@ class PatientDetailScreen extends StatefulWidget {
   State<PatientDetailScreen> createState() => _PatientDetailScreenState();
 }
 
-class _PatientDetailScreenState extends State<PatientDetailScreen> {
+class _PatientDetailScreenState extends State<PatientDetailScreen> with ThemeReactive<PatientDetailScreen> {
   Patient? _patient;
   List<EcgRecord> _records = const [];
   String? _error;
@@ -255,19 +254,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     header,
-                    if (_records.isNotEmpty) ...[
-                      SizedBox(height: 16),
-                      CurrentDiagnosisCard(
-                        record: _records.first,
-                        onExplain: () => _openRecord(_records.first),
-                      ),
-                      SizedBox(height: 16),
-                      EvolutionCard(records: _records),
-                      if (_records.length >= 2) ...[
-                        SizedBox(height: 16),
-                        ComparisonCard(records: _records),
-                      ],
-                    ],
                     SizedBox(height: 18),
                     Text('Historial de ECG (${_records.length})',
                         style: TextStyle(

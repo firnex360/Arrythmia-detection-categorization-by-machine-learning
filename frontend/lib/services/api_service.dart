@@ -173,6 +173,19 @@ class ApiService {
   }
 
   // ── Analysis + records ──────────────────────────────────────────────────
+  /// Runs the model on a file WITHOUT storing anything (preview). Used so the
+  /// doctor can review the result before choosing a patient.
+  static Future<PredictionResult> predict({
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    final request = http.MultipartRequest('POST', _u('/predict'))
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final streamed = await request.send().timeout(const Duration(seconds: 60));
+    final resp = await http.Response.fromStream(streamed);
+    return PredictionResult.fromJson(_decode(resp));
+  }
+
   /// Uploads an ECG file for [patientId], runs the model, and stores the result.
   /// Returns (record, alreadyExisted). If the same file was analysed before, the
   /// stored record is returned unchanged.

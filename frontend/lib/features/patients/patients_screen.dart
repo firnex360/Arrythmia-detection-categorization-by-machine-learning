@@ -16,7 +16,7 @@ class PatientsScreen extends StatefulWidget {
   State<PatientsScreen> createState() => _PatientsScreenState();
 }
 
-class _PatientsScreenState extends State<PatientsScreen> {
+class _PatientsScreenState extends State<PatientsScreen> with ThemeReactive<PatientsScreen> {
   List<Patient>? _patients;
   String? _error;
   String _query = '';

@@ -1,15 +1,14 @@
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 
-import 'package:frontend/services/api_service.dart';
-import 'package:frontend/features/analysis/ecg_picker.dart';
-import 'package:frontend/models/models.dart';
-import 'package:frontend/features/patients/patient_form.dart';
-import 'package:frontend/features/results/result_screen.dart';
 import 'package:frontend/core/theme.dart';
+import 'package:frontend/features/analysis/ecg_picker.dart';
+import 'package:frontend/features/results/result_screen.dart';
+import 'package:frontend/services/api_service.dart';
 
-/// The doctor's first action: import an ECG file, then attach it to a patient
-/// (existing or newly created) and run the analysis.
+/// The doctor's first action: import an ECG file and analyse it. The result is
+/// shown WITHOUT a patient — the doctor reviews everything and can then assign it
+/// to a patient (existing or new) from the result screen.
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -17,10 +16,9 @@ class AnalysisScreen extends StatefulWidget {
   State<AnalysisScreen> createState() => _AnalysisScreenState();
 }
 
-class _AnalysisScreenState extends State<AnalysisScreen> {
+class _AnalysisScreenState extends State<AnalysisScreen>
+    with ThemeReactive<AnalysisScreen> {
   PickedEcg? _file;
-  List<Patient>? _patients;
-  String _query = '';
   bool _busy = false;
   String? _error;
 
@@ -32,7 +30,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         _file = f;
         _error = null;
       });
-      _loadPatients();
     } catch (e) {
       setState(() => _error = '$e');
     }
@@ -51,105 +48,70 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       _file = PickedEcg(bytes, xf.name);
       _error = null;
     });
-    _loadPatients();
   }
 
-  Future<void> _loadPatients() async {
-    try {
-      final list = await ApiService.listPatients();
-      if (mounted) setState(() => _patients = list);
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    }
-  }
-
-  Future<void> _analyzeFor(Patient p) async {
+  Future<void> _analyze() async {
     if (_file == null || _busy) return;
     setState(() => _busy = true);
     try {
-      final (record, existed) = await ApiService.analyzeForPatient(
-        patientId: p.id,
-        bytes: _file!.bytes,
-        filename: _file!.name,
-      );
-      EcgRecord full = record;
-      if (record.result == null) full = await ApiService.getRecord(record.id);
+      final result =
+          await ApiService.predict(bytes: _file!.bytes, filename: _file!.name);
       if (!mounted) return;
+      final source = _file!;
       setState(() {
         _busy = false;
-        _file = null; // reset for next analysis
-        _query = '';
+        _file = null; // ready for the next one
       });
-      if (full.result != null) {
-        await Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => ResultScreen(
-            result: full.result!,
-            recordId: full.id,
-            initialNotes: full.doctorNotes,
-            initialVerdict: full.verdict,
-            initialTrueLabel: full.trueLabel,
-            alreadyExisted: existed,
-            patientName: p.name,
-          ),
-        ));
-      }
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ResultScreen(result: result, source: source),
+      ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      _showError('$e');
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('No se pudo analizar'),
+          content: Text('$e'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK')),
+          ],
+        ),
+      );
     }
-  }
-
-  Future<void> _createAndAnalyze() async {
-    final created = await showPatientForm(context);
-    if (created != null) {
-      _loadPatients();
-      _analyzeFor(created);
-    }
-  }
-
-  void _showError(String msg) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('No se pudo analizar'),
-        content: Text(msg),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('OK')),
-        ],
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text('Analizar un ECG',
-                style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.text)),
-            const SizedBox(height: 4),
-            Text(
-              _file == null
-                  ? 'Importa un archivo de ECG (.pt · .mat · .dat) para que el modelo lo analice.'
-                  : 'Elige el paciente al que pertenece este ECG, o crea uno nuevo.',
-              style: TextStyle(color: AppColors.muted, fontSize: 13),
-            ),
-            const SizedBox(height: 20),
-            if (_error != null) ...[
-              _ErrorBanner(text: _error!),
-              const SizedBox(height: 16),
+    return Scaffold(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text('Analizar un ECG',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.text)),
+              const SizedBox(height: 4),
+              Text(
+                'Importa un archivo de ECG (.pt · .mat · .dat). Verás el resultado '
+                'completo y luego podrás asignarlo a un paciente.',
+                style: TextStyle(color: AppColors.muted, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              if (_error != null) ...[
+                _ErrorBanner(text: _error!),
+                const SizedBox(height: 16),
+              ],
+              if (_file == null) _dropZone() else _fileReady(),
             ],
-            if (_file == null) _dropZone() else _patientChooser(),
-          ],
+          ),
         ),
       ),
     );
@@ -165,7 +127,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           borderRadius: BorderRadius.circular(16),
           onTap: _pick,
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
+            padding: const EdgeInsets.symmetric(vertical: 52, horizontal: 20),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
@@ -173,7 +135,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             child: Column(
               children: [
                 Icon(Icons.cloud_upload_outlined,
-                    size: 52, color: AppColors.accent),
+                    size: 54, color: AppColors.accent),
                 const SizedBox(height: 14),
                 Text('Haz clic para elegir un archivo o arrástralo aquí',
                     textAlign: TextAlign.center,
@@ -192,21 +154,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     );
   }
 
-  Widget _patientChooser() {
-    final all = _patients;
-    final items = (all ?? const <Patient>[]).where((p) {
-      if (_query.trim().isEmpty) return true;
-      final q = _query.toLowerCase();
-      return p.name.toLowerCase().contains(q) ||
-          (p.cedula ?? '').toLowerCase().contains(q);
-    }).toList();
-
+  Widget _fileReady() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Selected file chip.
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
@@ -230,86 +183,23 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                onChanged: (v) => setState(() => _query = v),
-                style: TextStyle(color: AppColors.text),
-                decoration: InputDecoration(
-                  hintText: 'Buscar paciente por nombre o cédula…',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  filled: true,
-                  fillColor: AppColors.surface,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.border)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.border)),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            FilledButton.icon(
-              onPressed: _busy ? null : _createAndAnalyze,
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18)),
-              icon: const Icon(Icons.person_add_alt_1, size: 18),
-              label: const Text('Nuevo'),
-            ),
-          ],
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _busy ? null : _analyze,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+            backgroundColor: AppColors.accent,
+            foregroundColor: Colors.black,
+          ),
+          icon: _busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.black))
+              : const Icon(Icons.analytics_outlined),
+          label: Text(_busy ? 'Analizando…' : 'Analizar ECG'),
         ),
-        const SizedBox(height: 14),
-        if (_busy)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 30),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (all == null)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 30),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else if (items.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Text(
-              all.isEmpty
-                  ? 'No tienes pacientes todavía. Crea uno con el botón “Nuevo”.'
-                  : 'Ningún paciente coincide con la búsqueda.',
-              style: TextStyle(color: AppColors.muted),
-            ),
-          )
-        else
-          for (final p in items)
-            Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-                  child: Text(p.initials,
-                      style: TextStyle(
-                          color: AppColors.accent, fontWeight: FontWeight.w700)),
-                ),
-                title: Text(p.name,
-                    style: TextStyle(
-                        color: AppColors.text, fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  [
-                    if (p.cedula != null && p.cedula!.isNotEmpty) 'CC ${p.cedula}',
-                    if (p.age != null) '${p.age} años',
-                    p.genderLabel,
-                  ].join(' · '),
-                  style: TextStyle(color: AppColors.muted, fontSize: 12),
-                ),
-                trailing: Icon(Icons.play_arrow_rounded, color: AppColors.accent),
-                onTap: () => _analyzeFor(p),
-              ),
-            ),
       ],
     );
   }

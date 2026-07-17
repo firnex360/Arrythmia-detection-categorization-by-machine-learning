@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:frontend/features/analysis/analysis_screen.dart';
 import 'package:frontend/services/api_service.dart';
-import 'package:frontend/features/dashboards/dashboard_screen.dart';
+import 'package:frontend/features/arrhythmias/arrhythmias_screen.dart';
 import 'package:frontend/features/auth/login_screen.dart';
+import 'package:frontend/features/dashboards/dashboard_screen.dart';
+import 'package:frontend/features/dashboards/risk_screen.dart';
 import 'package:frontend/features/patients/patients_screen.dart';
 import 'package:frontend/features/profile/profile_screen.dart';
-import 'package:frontend/features/dashboards/risk_screen.dart';
 import 'package:frontend/core/session.dart';
 import 'package:frontend/core/theme.dart';
 
@@ -19,6 +20,7 @@ class _NavItem {
 const _navItems = [
   _NavItem(Icons.upload_file_rounded, 'Análisis'),
   _NavItem(Icons.people_alt_rounded, 'Pacientes'),
+  _NavItem(Icons.favorite_border_rounded, 'Arritmias'),
   _NavItem(Icons.insights_rounded, 'Dashboard'),
   _NavItem(Icons.warning_amber_rounded, 'Riesgo'),
 ];
@@ -32,13 +34,14 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with ThemeReactive<AppShell> {
   int _index = 0;
 
   Widget _bodyFor(int i) => switch (i) {
         0 => const AnalysisScreen(),
         1 => const PatientsScreen(),
-        2 => const DashboardScreen(),
+        2 => const ArrhythmiasScreen(),
+        3 => const DashboardScreen(),
         _ => const RiskScreen(),
       };
 
@@ -123,7 +126,7 @@ class _Sidebar extends StatelessWidget {
                     color: AppColors.accent, size: 26),
                 if (!compact) ...[
                   const SizedBox(width: 10),
-                  Text('ECG IA',
+                  Text('SIEMIA',
                       style: TextStyle(
                           color: AppColors.text,
                           fontSize: 17,

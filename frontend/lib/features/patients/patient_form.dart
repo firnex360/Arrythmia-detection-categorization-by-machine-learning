@@ -29,7 +29,7 @@ class _PatientForm extends StatefulWidget {
   State<_PatientForm> createState() => _PatientFormState();
 }
 
-class _PatientFormState extends State<_PatientForm> {
+class _PatientFormState extends State<_PatientForm> with ThemeReactive<_PatientForm> {
   late final TextEditingController _cedula;
   late final TextEditingController _first;
   late final TextEditingController _last;
