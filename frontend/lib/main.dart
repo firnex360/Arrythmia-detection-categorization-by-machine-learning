@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'home_screen.dart';
-import 'theme.dart';
+import 'package:frontend/features/auth/login_screen.dart';
+import 'package:frontend/core/theme.dart';
 
 void main() {
   runApp(const EcgApp());
@@ -12,11 +12,17 @@ class EcgApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ECG Arrhythmia Detector',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: const HomeScreen(),
+    // Rebuild the whole app when the light/dark mode toggles.
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'SIEMIA',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+          home: const LoginScreen(),
+        );
+      },
     );
   }
 }

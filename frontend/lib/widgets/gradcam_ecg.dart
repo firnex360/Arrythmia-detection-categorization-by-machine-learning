@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Draws an ECG trace and colours it by Grad-CAM importance.
 ///
@@ -28,16 +28,16 @@ class GradCamEcg extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('Lead $leadLabel',
-                style: const TextStyle(
+            Text('Derivación $leadLabel',
+                style: TextStyle(
                     color: AppColors.muted,
                     fontWeight: FontWeight.w600,
                     fontSize: 13)),
-            const Spacer(),
+            Spacer(),
             const _HeatLegend(),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         AspectRatio(
           aspectRatio: 2.4,
           child: ClipRRect(
@@ -64,15 +64,15 @@ class _HeatLegend extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('low',
+        Text('bajo',
             style: TextStyle(color: AppColors.muted, fontSize: 11)),
-        const SizedBox(width: 6),
+        SizedBox(width: 6),
         Container(
           width: 70,
           height: 8,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(4),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               colors: [
                 Color(0xFF1E3A8A),
                 Color(0xFF10B981),
@@ -82,8 +82,8 @@ class _HeatLegend extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 6),
-        const Text('high',
+        SizedBox(width: 6),
+        Text('alto',
             style: TextStyle(color: AppColors.muted, fontSize: 11)),
       ],
     );

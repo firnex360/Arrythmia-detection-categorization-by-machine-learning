@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../models.dart';
-import '../theme.dart';
+import 'package:frontend/models/models.dart';
+import 'package:frontend/core/theme.dart';
 
 /// Horizontal bars showing the probability the model assigned to every
 /// arrhythmia class — so the user sees not just the verdict but also which
@@ -26,7 +26,7 @@ class ProbabilityBars extends StatelessWidget {
     final name = result.classNames[code] ?? code;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -38,7 +38,7 @@ class ProbabilityBars extends StatelessWidget {
                 decoration:
                     BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 code,
                 style: TextStyle(
@@ -46,12 +46,12 @@ class ProbabilityBars extends StatelessWidget {
                   color: AppColors.text,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(
                 child: Text(
                   name,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                  style: TextStyle(color: AppColors.muted, fontSize: 12),
                 ),
               ),
               Text(
@@ -64,7 +64,7 @@ class ProbabilityBars extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
