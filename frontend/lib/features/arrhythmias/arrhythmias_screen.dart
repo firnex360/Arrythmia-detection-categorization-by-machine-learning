@@ -45,9 +45,9 @@ const _arrhythmias = <ArrhythmiaInfo>[
         'Es el ritmo normal; no se detecta arritmia significativa.',
     features: [
       'Intervalos R-R regulares (espaciado uniforme entre latidos)',
-      'Onda P clara y positiva antes de cada complejo QRS',
+      'Onda P clara y positiva (negativo en derivación aVR)',
+      'PR constante entre 120–200 ms',
       'Frecuencia entre 60 y 100 lpm',
-      'Complejo QRS estrecho y constante',
     ],
     pattern: EcgPattern(spacing: 90),
   ),
