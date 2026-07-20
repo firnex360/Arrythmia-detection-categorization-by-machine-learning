@@ -427,3 +427,10 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ── Despliegue: base de datos local (datos de pacientes, NO subir) ──
+ecg_app.db
+*.db-journal
+
+# Build de Flutter web (se genera en el CI de Vercel)
+frontend/build/

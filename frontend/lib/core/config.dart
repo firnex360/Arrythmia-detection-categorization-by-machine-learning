@@ -9,9 +9,18 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   AppConfig._();
 
+  /// URL del backend Flask, fijada al compilar.
+  ///
+  /// En producción se pasa la URL pública de Render:
+  ///     flutter build web --dart-define=API_URL=https://siemia-api.onrender.com
+  ///
+  /// Si no se pasa, queda vacía y se usan los valores locales de desarrollo.
+  static const String _buildTimeUrl = String.fromEnvironment('API_URL');
+
   /// Base URL of the Flask backend.
   ///
   /// Defaults are chosen so the app "just works" in the common cases:
+  ///   * API_URL definida al compilar -> esa URL (despliegue en Render).
   ///   * Android emulator  -> 10.0.2.2 maps to the host machine's localhost.
   ///   * Everything else   -> localhost.
   ///
@@ -20,6 +29,9 @@ class AppConfig {
   static String baseUrl = _defaultBaseUrl();
 
   static String _defaultBaseUrl() {
+    // La URL de compilación gana: es la que se usa en el despliegue.
+    if (_buildTimeUrl.isNotEmpty) return _buildTimeUrl;
+
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:5000';
     }

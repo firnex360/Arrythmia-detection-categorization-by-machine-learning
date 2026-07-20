@@ -1,0 +1,29 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Configuración de despliegue del backend (SIEMIA) en Render.
+#
+# Render lee este archivo como "Blueprint": al conectar el repositorio crea el
+# servicio con estos ajustes, sin configurarlos a mano en la interfaz.
+# ──────────────────────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: siemia-api
+    runtime: python
+    plan: free
+    region: oregon
+
+    # Rama que Render observa y despliega. Sin esta línea usaría "main".
+    # Cada push a esta rama dispara un redespliegue automático.
+    branch: mari
+
+    buildCommand: pip install -r requirements.txt
+
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Desactiva el modo debug de Flask: en producción expone trazas internas.
+      - key: FLASK_DEBUG
+        value: "0"
+
+    healthCheckPath: /health
