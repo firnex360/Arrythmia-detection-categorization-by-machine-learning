@@ -47,8 +47,24 @@ MODEL_PATH    = os.path.join(BASE_DIR, "ecg_arrhythmia_model_v5_mita.pt")
 HISTORY_PATH  = os.path.join(BASE_DIR, "ecg_arrhythmia_model_v5_history_mita.json")
 DEVICE        = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Hilos de PyTorch.
+#
+# Por defecto PyTorch abre un hilo por núcleo (4 en una máquina normal). En un
+# contenedor pequeño como el plan gratuito de Render, que asigna una fracción de
+# CPU, esos hilos se pelean por el mismo núcleo: la inferencia se vuelve mucho
+# más lenta y cada hilo suma memoria, lo que puede tumbar el proceso.
+#
+# Con un solo hilo la inferencia es predecible y ligera. El modelo es pequeño
+# (ResNet1D sobre 12x1000), así que no se pierde nada notable en local.
+# ──────────────────────────────────────────────────────────────────────────────
+torch.set_num_threads(int(os.environ.get("TORCH_NUM_THREADS", "1")))
+
 # Samples the model was trained on (PTB-XL 100 Hz × 10 s)
 TARGET_SAMPLES = 1000
+
+# Derivación sobre la que se dibuja el mapa de calor Grad-CAM en la interfaz.
+GRADCAM_LEAD = "II"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ECGtizer (image / PDF → signal) configuration
@@ -936,8 +952,26 @@ def run_prediction(file_bytes: bytes, ext: str, filename: str) -> dict:
 
     LEAD_LABELS = ["I", "II", "III", "aVR", "aVL", "aVF",
                    "V1", "V2", "V3", "V4", "V5", "V6"]
-    all_leads = {LEAD_LABELS[i]: raw_signal[i, :].tolist()
-                 for i in range(raw_signal.shape[0])}
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Derivaciones que se devuelven.
+    #
+    # La interfaz sólo dibuja UNA derivación (la del Grad-CAM, la II). Enviar las
+    # 12 hacía que la respuesta pesara 236 KB, de los cuales 228 KB eran señal que
+    # nadie mostraba; además ese mismo JSON se guarda en `records.result_json`.
+    # Serializar 12.000 números en una CPU muy limitada cuesta tiempo y memoria.
+    #
+    # Con SEND_ALL_LEADS=1 se recupera el comportamiento anterior (útil si algún
+    # día la interfaz muestra las 12 derivaciones).
+    # ──────────────────────────────────────────────────────────────────────────
+    n_leads_out = raw_signal.shape[0]
+    if os.environ.get("SEND_ALL_LEADS", "0") == "1":
+        wanted = range(n_leads_out)
+    else:
+        gradcam_idx = LEAD_LABELS.index(GRADCAM_LEAD) if GRADCAM_LEAD in LEAD_LABELS else 0
+        wanted = [gradcam_idx] if gradcam_idx < n_leads_out else [0]
+
+    all_leads = {LEAD_LABELS[i]: raw_signal[i, :].tolist() for i in wanted}
 
     response = {
         "prediction":    pred_class,
@@ -951,7 +985,7 @@ def run_prediction(file_bytes: bytes, ext: str, filename: str) -> dict:
         "class_names":   {c: _FULL_NAMES.get(c, c) for c in CLASS_NAMES},
         "all_leads":     all_leads,
         "gradcam":       gradcam,
-        "gradcam_lead":  "II",
+        "gradcam_lead":  GRADCAM_LEAD,
         "filename":      filename,
     }
 

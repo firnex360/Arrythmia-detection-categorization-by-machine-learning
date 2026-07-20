@@ -26,4 +26,17 @@ services:
       - key: FLASK_DEBUG
         value: "0"
 
+      # ── Un solo hilo de cómputo ──────────────────────────────────────────
+      # El plan gratuito asigna una fracción de CPU. Si las librerías numéricas
+      # abren un hilo por núcleo, se pelean por el mismo procesador: la petición
+      # pasa de <1 s a más de un minuto y el worker termina cayéndose.
+      # Estas variables se aplican ANTES de importar torch, que es cuando OpenMP
+      # decide su número de hilos.
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      - key: TORCH_NUM_THREADS
+        value: "1"
+
     healthCheckPath: /health
