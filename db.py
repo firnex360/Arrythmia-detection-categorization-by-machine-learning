@@ -112,6 +112,23 @@ def init_db():
         if "avatar_color" not in doc_cols:
             conn.execute("ALTER TABLE doctors ADD COLUMN avatar_color TEXT")
 
+        # ── Cédula única por doctor ──────────────────────────────────────────
+        # Índice parcial: sólo aplica cuando hay cédula, de modo que varios
+        # pacientes pueden quedarse sin ella (el campo es opcional).
+        # Es la red de seguridad; el mensaje amigable lo da _check_cedula_libre.
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_cedula_por_doctor "
+                "ON patients(doctor_id, cedula) "
+                "WHERE cedula IS NOT NULL AND TRIM(cedula) != ''"
+            )
+        except sqlite3.IntegrityError:
+            # Una base anterior ya traía duplicados: no se puede crear el índice.
+            # El servicio sigue arrancando y la validación en Python evita que se
+            # añadan nuevos; los existentes hay que corregirlos a mano.
+            print("[AVISO] Hay cédulas repetidas en la base de datos; no se pudo "
+                  "crear el índice único. Corrige los duplicados para activarlo.")
+
     # Seed a demo account so the app is usable immediately.
     if get_doctor_by_username("admin") is None:
         create_doctor("admin", "admin", "Doctor Demo")
@@ -302,6 +319,39 @@ def _patient_fields(d: dict):
     )
 
 
+def _check_cedula_libre(conn, doctor_id, cedula, exclude_patient_id=None):
+    """
+    Impide que un mismo doctor registre dos pacientes con la misma cédula.
+
+    La unicidad es POR DOCTOR, no global: cada médico gestiona su propia lista de
+    pacientes, así que dos doctores distintos pueden atender a la misma persona.
+    Hacerla global también filtraría información entre cuentas (al rechazar una
+    cédula se revelaría que otro médico ya tiene a ese paciente).
+
+    Una cédula vacía no se valida: el campo es opcional y varios pacientes pueden
+    quedarse sin ella.
+    """
+    if not cedula:
+        return
+
+    sql = (
+        "SELECT name FROM patients "
+        "WHERE doctor_id = ? AND cedula IS NOT NULL "
+        "AND TRIM(cedula) = TRIM(?) COLLATE NOCASE"
+    )
+    params = [doctor_id, cedula]
+    if exclude_patient_id is not None:      # al editar, ignorar al propio paciente
+        sql += " AND id != ?"
+        params.append(exclude_patient_id)
+
+    existente = conn.execute(sql, params).fetchone()
+    if existente is not None:
+        raise ValueError(
+            f"Ya tienes un paciente registrado con la cédula {cedula}: "
+            f"{existente['name']}."
+        )
+
+
 def list_patients(doctor_id: int) -> list:
     with _conn() as conn:
         rows = conn.execute(
@@ -321,6 +371,7 @@ def list_patients(doctor_id: int) -> list:
 def create_patient(doctor_id, fields: dict) -> dict:
     cedula, first, last, name, dob, gender, notes = _patient_fields(fields)
     with _conn() as conn:
+        _check_cedula_libre(conn, doctor_id, cedula)
         cur = conn.execute(
             "INSERT INTO patients "
             "(doctor_id, cedula, first_name, last_name, name, dob, gender, notes, created_at) "
@@ -346,6 +397,9 @@ def update_patient(patient_id, doctor_id, fields: dict):
         return None
     cedula, first, last, name, dob, gender, notes = _patient_fields(fields)
     with _conn() as conn:
+        # exclude_patient_id: al editar sin cambiar la cédula, el propio paciente
+        # no debe contar como duplicado.
+        _check_cedula_libre(conn, doctor_id, cedula, exclude_patient_id=patient_id)
         conn.execute(
             "UPDATE patients SET cedula = ?, first_name = ?, last_name = ?, "
             "name = ?, dob = ?, gender = ?, notes = ? "
