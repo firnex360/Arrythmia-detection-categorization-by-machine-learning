@@ -1,0 +1,72 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Publica el frontend (Flutter web) en GitHub Pages.
+#
+# Se ejecuta en cada push a la rama `mari` que toque la carpeta frontend/.
+# GitHub compila la app en sus servidores y publica el resultado, así que no hay
+# que subir la carpeta build/ al repositorio.
+# ──────────────────────────────────────────────────────────────────────────────
+name: Publicar frontend en GitHub Pages
+
+on:
+  push:
+    branches: [mari]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  # Permite lanzarlo a mano desde la pestaña Actions de GitHub.
+  workflow_dispatch:
+
+# Permisos que necesita la acción de despliegue de Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Evita despliegues simultáneos pisándose entre sí.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Descargar dependencias
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Compilar para web
+        working-directory: frontend
+        # --base-href: el sitio se sirve desde una subcarpeta con el nombre del
+        #   repositorio, no desde la raíz del dominio. Sin esto, la app carga en
+        #   blanco porque busca los recursos en la ruta equivocada.
+        # --dart-define: incrusta la URL del backend en Render al compilar.
+        run: |
+          flutter build web \
+            --base-href "/${GITHUB_REPOSITORY#*/}/" \
+            --dart-define=API_URL=https://siemia-api.onrender.com
+
+      - name: Preparar el artefacto de Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

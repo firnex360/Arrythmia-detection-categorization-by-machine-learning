@@ -2,12 +2,13 @@
 
 La aplicación se despliega en dos servicios gratuitos:
 
-| Componente | Plataforma | Qué se sube |
+| Componente | Plataforma | Cómo se publica |
 |---|---|---|
-| Backend (Flask + PyTorch + SQLite) | **Render** | Todo el repositorio |
-| Frontend (Flutter web) | **Vercel** | La carpeta `frontend/build/web` |
+| Backend (Flask + PyTorch + SQLite) | **Render** | Lee el repositorio (rama `mari`) |
+| Frontend (Flutter web) | **GitHub Pages** | GitHub Actions lo compila y publica solo |
 
-El orden importa: **primero Render**, porque necesitas su URL para compilar el frontend.
+El orden importa: **primero Render**, porque su URL se incrusta en el frontend al
+compilarlo.
 
 ---
 
@@ -53,47 +54,59 @@ Si ves eso, el backend está en línea y el modelo cargó correctamente.
 
 ---
 
-## Paso 2 — Frontend en Vercel
+## Paso 2 — Frontend en GitHub Pages
 
-### 2.1 Compilar apuntando a Render
+No hay que compilar a mano: el archivo `.github/workflows/deploy-frontend.yml`
+hace que GitHub compile la app y la publique en cada push.
 
-Sustituye la URL por la tuya:
+### 2.1 Activar Pages (una sola vez)
+
+1. En GitHub, entra al repositorio → **Settings** → **Pages**.
+2. En **Source**, elige **GitHub Actions** (no "Deploy from a branch").
+3. Guarda.
+
+### 2.2 Lanzar el despliegue
+
+Con el workflow ya en el repositorio, basta con un push que toque `frontend/`.
+Para lanzarlo sin cambiar nada: **Actions** → *Publicar frontend en GitHub Pages*
+→ **Run workflow**.
+
+Tarda unos 3–5 minutos. Al terminar, la app queda en:
+
+```
+https://firnex360.github.io/Arrythmia-detection-categorization-by-machine-learning/
+```
+
+Ábrela e inicia sesión con **admin / admin**.
+
+### Si quieres compilar en local
+
+Sólo hace falta para probar antes de subir:
 
 ```bash
 cd frontend
-flutter build web --dart-define=API_URL=https://siemia-api.onrender.com
+flutter build web \
+  --base-href /Arrythmia-detection-categorization-by-machine-learning/ \
+  --dart-define=API_URL=https://siemia-api.onrender.com
 ```
 
-La URL queda incrustada en el build; no hay que configurar nada dentro de la app.
-
-### 2.2 Publicar
-
-```bash
-npm install -g vercel      # sólo la primera vez
-cd build/web
-vercel --prod
-```
-
-Vercel hará unas preguntas (nombre del proyecto, etc.). Acepta los valores por
-defecto: detecta que es un sitio estático automáticamente.
-
-Al terminar te da una URL como `https://siemia.vercel.app`. Ábrela e inicia sesión
-con **admin / admin**.
-
-> Alternativa sin instalar nada: entra a [vercel.com/new](https://vercel.com/new) y
-> arrastra la carpeta `frontend/build/web` a la página.
+> **En Windows con Git Bash**, antepón `MSYS_NO_PATHCONV=1` al comando. Si no,
+> Git Bash convierte `/Arrythmia-.../` en una ruta de Windows
+> (`C:/Program Files/Git/...`) y el `base href` queda mal, dejando la página en
+> blanco. En PowerShell o en el runner de GitHub (Linux) no ocurre.
 
 ---
 
 ## Actualizar la aplicación
 
-- **Backend**: `git push origin mari` → Render redespliega solo (observa esa rama).
-- **Frontend**: hay que recompilar y volver a publicar:
-  ```bash
-  cd frontend
-  flutter build web --dart-define=API_URL=https://siemia-api.onrender.com
-  cd build/web && vercel --prod
-  ```
+Ambas partes se actualizan solas al subir cambios:
+
+```bash
+git push origin mari
+```
+
+- **Backend**: Render detecta el push y redespliega.
+- **Frontend**: GitHub Actions recompila y republica (sólo si cambió `frontend/`).
 
 ---
 
